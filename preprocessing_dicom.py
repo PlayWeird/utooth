@@ -104,4 +104,4 @@ def plot_3d(image, threshold=-300):
     plt.show()
 
 
-plot_3d(pix_resampled, 0)
+plot_3d(pix_resampled, 1200)
