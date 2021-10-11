@@ -111,17 +111,17 @@ def plot_3d_skeleton(ctvol, units, outprefix):
     #from https://www.kaggle.com/gzuidhof/full-preprocessing-tutorial
     #Get high threshold to show mostly bones
     if units == 'HU':
-        threshold = 400
+        threshold = 1100
     elif units == 'processed':
         threshold = 0.99
-    
-    # Position the scan upright, 
+
+    # Position the scan upright,
     # so the head of the patient would be at the top facing the camera
     p = ctvol.transpose(2,1,0)
     p = np.flip(p, axis = 0) #need this line or else the patient is upside-down
-    
+
     #https://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.marching_cubes_lewiner
-    verts, faces, _ignore1, _ignore2 = measure.marching_cubes_lewiner(p, threshold)
+    verts, faces, _ignore1, _ignore2 = measure.marching_cubes(p, threshold)
 
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection='3d')
@@ -135,9 +135,10 @@ def plot_3d_skeleton(ctvol, units, outprefix):
     ax.set_xlim(0, p.shape[0])
     ax.set_ylim(0, p.shape[1])
     ax.set_zlim(0, p.shape[2])
-    
-    plt.savefig(outprefix+'_3D_Bones.png')
-    plt.close()    
+
+    # plt.imsave(outprefix+'_3D_Bones.png')
+    plt.show()
+    plt.close()
 
 def make_gifs(ctvol, outprefix, chosen_views):
     """Save GIFs of the <ctvol> in the axial, sagittal, and coronal planes.
@@ -164,6 +165,7 @@ def make_gifs(ctvol, outprefix, chosen_views):
         images = []
         for slicenum in range(ctvol.shape[0]):
             images.append(ctvol[slicenum,:,:])
+        images.reverse()
         imageio.mimsave(outprefix+'_axial.gif',images)
         print('\t\tdone with axial gif')
     
