@@ -62,6 +62,7 @@ def resample(image, spacing, new_spacing=[1, 1, 1]):
     return image, new_spacing
 
 
+# TODO build plot_3d functionality into plot_3D_with_labels...rename to plot_3D
 def plot_3d(image, threshold=0, transpose=[0, 1, 2], step_size=2):
     # perform a image transformation
     # transpose = [2, 1, 0] for upright sample

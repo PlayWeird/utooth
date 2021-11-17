@@ -2,6 +2,8 @@ from typing import Optional
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, random_split, Dataset
 from torch.utils.data.dataset import T_co
+import glob
+import ct_utils
 
 
 class CTScanDataModule(pl.LightningDataModule):
@@ -36,13 +38,20 @@ class CTScanDataModule(pl.LightningDataModule):
 
 class CTDataSet(Dataset):
     def __init__(self, data_dir: str):
-
-        # Use os.walk to get the list of npy files
-        pass
+        self.data_path_list = glob.glob(data_dir + '*')
+        self.data_path_list.sort()
 
     def __len__(self):
         return len(self.data_path_list)
 
     def __getitem__(self, index):
-        # hot damn
-        pass
+        return get_labeled_pair(self.data_path_list[index])
+
+
+def get_labeled_pair(sample_path):
+    sample_label_paths = glob.glob(sample_path + '/*')
+    if len(sample_label_paths) == 1:
+        sample_label_paths.append(None)
+    else:
+        sample_label_paths.reverse()
+    return {'data': sample_label_paths[0], 'label': sample_label_paths[1]}
