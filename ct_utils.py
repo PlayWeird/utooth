@@ -94,7 +94,7 @@ def plot_3d_with_labels(image, labels, threshold=0, transpose=[0, 1, 2], step_si
     ax = fig.add_subplot(111, projection='3d')
     # Fancy indexing: `verts[faces]` to generate a collection of triangles
     mesh = Poly3DCollection(verts[faces], alpha=0.50)
-    mesh2 = Poly3DCollection(l_verts[l_faces], alpha=1.0)
+    mesh2 = Poly3DCollection(l_verts[l_faces], alpha=0.85)
     face_color = [0.45, 0.45, 0.75]
     l_face_color = [1.0, 0, 0]
     mesh.set_facecolor(face_color)
@@ -165,7 +165,7 @@ def binarize(image):
     return new_image
 
 
-def jaw_isolation(volume, hu_threshold=(1600, 2000), iterations=2, cut_off=1.5, growth_rate=1):
+def jaw_isolation(volume, hu_threshold=(1600, 2000), iterations=2, cut_off=1.5, growth_rate=1, size=None):
     hu_min = hu_threshold[0]
     hu_max = hu_threshold[1]
     filtered_image = filter_hounsfield_bounds(volume, hu_min, hu_max)
@@ -179,8 +179,13 @@ def jaw_isolation(volume, hu_threshold=(1600, 2000), iterations=2, cut_off=1.5, 
         bounding_coords = np.squeeze(bounding_coords[args_to_keep])
         cut_off *= growth_rate
 
-    max_box = np.amax(bounding_coords, axis=0)
-    min_box = np.amin(bounding_coords, axis=0)
+    if not size:
+        max_box = np.amax(bounding_coords, axis=0)
+        min_box = np.amin(bounding_coords, axis=0)
+    else:
+        mean = bounding_coords.mean(axis=0)
+        max_box = [int(mean[0] + size[0]/2), int(mean[1] + size[1]/2), int(mean[2] + size[2]/2)]
+        min_box = [int(mean[0] - size[0]/2), int(mean[1] - size[1]/2), int(mean[2] - size[2]/2)]
     return min_box, max_box
 
 
