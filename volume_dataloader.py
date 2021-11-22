@@ -1,5 +1,11 @@
+import os.path
+from functools import lru_cache
 from typing import Optional
+
+import nibabel as nib
+import numpy as np
 import pytorch_lightning as pl
+import torch
 from torch.utils.data import DataLoader, random_split, Dataset
 from torch.utils.data.dataset import T_co
 import glob
@@ -45,13 +51,22 @@ class CTDataSet(Dataset):
         return len(self.data_path_list)
 
     def __getitem__(self, index):
-        return get_labeled_pair(self.data_path_list[index])
+        sample = get_data_sample(self.data_path_list[index])
+        nifti_jaw = nib.load(sample['data'])
+        jaw = np.asarray(nifti_jaw.dataobj)
+        nifti_label = nib.load(sample['label'])
+        label = np.asarray(nifti_label.dataobj)
+
+        return torch.Tensor(jaw), torch.Tensor(label)
 
 
-def get_labeled_pair(sample_path):
+def get_data_sample(sample_path):
     sample_label_paths = glob.glob(sample_path + '/*')
+    id = os.path.split(sample_path)[1].split('-')[1]
     if len(sample_label_paths) == 1:
         sample_label_paths.append(None)
     else:
         sample_label_paths.reverse()
-    return {'data': sample_label_paths[0], 'label': sample_label_paths[1]}
+
+    sample = {'data': sample_label_paths[0], 'label': sample_label_paths[1], 'id': id}
+    return sample
