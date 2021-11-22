@@ -53,11 +53,12 @@ class CTDataSet(Dataset):
     def __getitem__(self, index):
         sample = get_data_sample(self.data_path_list[index])
         nifti_jaw = nib.load(sample['data'])
-        jaw = np.asarray(nifti_jaw.dataobj)
+        jaw = torch.Tensor(np.asarray(nifti_jaw.dataobj))
         nifti_label = nib.load(sample['label'])
-        label = np.asarray(nifti_label.dataobj)
-
-        return torch.Tensor(jaw), torch.Tensor(label)
+        label = torch.Tensor(np.asarray(nifti_label.dataobj))
+        jaw = torch.unsqueeze(jaw, 0)
+        label = torch.unsqueeze(label, 0)
+        return jaw, label
 
 
 def get_data_sample(sample_path):
