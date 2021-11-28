@@ -1,13 +1,13 @@
 import os
-
-import numpy
 import numpy as np  # linear algebra
 import pydicom
 import scipy.ndimage
 import imageio
 import matplotlib.pyplot as plt
+import glob
+import nibabel as nib
+import pathlib
 from scipy.spatial import distance_matrix
-
 from skimage import measure, morphology
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -186,6 +186,10 @@ def jaw_isolation(volume, hu_threshold=(1600, 2000), iterations=2, cut_off=1.5, 
         mean = bounding_coords.mean(axis=0)
         max_box = [int(mean[0] + size[0]/2), int(mean[1] + size[1]/2), int(mean[2] + size[2]/2)]
         min_box = [int(mean[0] - size[0]/2), int(mean[1] - size[1]/2), int(mean[2] - size[2]/2)]
+        for index, minimum in enumerate(min_box):
+            if minimum < 0:
+                min_box[index] = 0
+                max_box[index] += np.abs(minimum) + 1
     return min_box, max_box
 
 
@@ -198,3 +202,67 @@ def plot_volume_histogram(volume, bins=None, range=None, color='c'):
     plt.xlabel("Values")
     plt.ylabel("Count")
     plt.show()
+
+
+def get_sample_label_id(sample_path, is_nifti_dataset=False):
+    sample_label_paths = glob.glob(sample_path + '/*')
+    id = os.path.split(sample_path)[1].split('-')[1]
+    if len(sample_label_paths) == 1:
+        sample_label_paths.append(None)
+    else:
+        if not is_nifti_dataset:
+            sample_label_paths.reverse()
+
+    sample = {'data': sample_label_paths[0], 'label': sample_label_paths[1], 'id': id}
+    return sample
+
+
+def split_label_channels(labels_matrix, num_channels=4):
+    # splits = np.unique(labels_matrix)[1:]
+    split_matrix = []
+    for label in range(num_channels):
+        label += 1
+        zero_matrix = np.zeros(labels_matrix.shape)
+        value_index = np.where(labels_matrix == label)
+        zero_matrix[value_index] = 1
+        split_matrix.append(zero_matrix)
+    print(np.stack(split_matrix).shape)
+    return np.stack(split_matrix)
+
+
+def convert_dicom_dataset_to_nifti(data_paths_list, new_root_path, separate_label_channels=True):
+    for index in range(len(data_paths_list)):
+        data_path = data_paths_list[index]['data']
+        label_path = data_paths_list[index]['label']
+        if not label_path:
+            print(f'{index}: does not have a label')
+            continue
+        sample = load_scan(data_path)
+        sample_pixels = convert_to_hounsfield(sample)
+        nifti = nib.load(label_path)
+        label = np.asarray(nifti.dataobj)
+        label = label.transpose(2, 1, 0)
+
+        spacing = get_dicom_spacing(sample)
+        pix_resampled, _ = resample(sample_pixels, spacing)
+        label_resampled, _ = resample(label, spacing)
+
+        min_box, max_box = jaw_isolation(pix_resampled, iterations=4, growth_rate=.98, size=[75, 75, 75])
+        jaw_isolated = extract_roi(pix_resampled, min_box, max_box)
+        label_isolated = extract_roi(label_resampled, min_box, max_box)
+        if separate_label_channels:
+            label_isolated = split_label_channels(label_isolated)
+
+        sample_id = data_paths_list[index]['id']
+        directory = new_root_path + f'case-{sample_id}/'
+        if not os.path.exists(directory):
+            print(f'{index}: Creating directory: {directory}')
+            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+
+        nifti_data = nib.Nifti1Image(jaw_isolated, np.eye(4))
+        nifti_label = nib.Nifti1Image(label_isolated, np.eye(4))
+        nib.save(nifti_data, os.path.join(directory, sample_id + '.nii'))
+        nib.save(nifti_label, os.path.join(directory, sample_id + '_label.nii'))
+        print(f'{index}: Converted: {data_paths_list[index]}')
+
+

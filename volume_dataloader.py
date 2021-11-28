@@ -13,7 +13,7 @@ import ct_utils
 
 
 class CTScanDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str = "path/to/dir", batch_size: int = 4):
+    def __init__(self, data_dir: str = "path/to/dir", batch_size: int = 5):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -51,7 +51,7 @@ class CTDataSet(Dataset):
         return len(self.data_path_list)
 
     def __getitem__(self, index):
-        sample = get_data_sample(self.data_path_list[index])
+        sample = ct_utils.get_sample_label_id(self.data_path_list[index], is_nifti_dataset=True)
         nifti_jaw = nib.load(sample['data'])
         jaw = torch.Tensor(np.asarray(nifti_jaw.dataobj))
         nifti_label = nib.load(sample['label'])
@@ -59,15 +59,3 @@ class CTDataSet(Dataset):
         jaw = torch.unsqueeze(jaw, 0)
         label = torch.unsqueeze(label, 0)
         return jaw, label
-
-
-def get_data_sample(sample_path):
-    sample_label_paths = glob.glob(sample_path + '/*')
-    id = os.path.split(sample_path)[1].split('-')[1]
-    if len(sample_label_paths) == 1:
-        sample_label_paths.append(None)
-    else:
-        sample_label_paths.reverse()
-
-    sample = {'data': sample_label_paths[0], 'label': sample_label_paths[1], 'id': id}
-    return sample
