@@ -1,4 +1,3 @@
-import os.path
 from functools import lru_cache
 from typing import Optional
 
@@ -13,29 +12,32 @@ import ct_utils
 
 
 class CTScanDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str = "path/to/dir", batch_size: int = 5):
+    def __init__(self, data_dir: str = "path/to/dir", batch_size: int = 5, num_workers: int = 6):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.ct_train = None
         self.ct_val = None
         self.ct_test = None
+        self.num_workers = num_workers
 
     def setup(self, stage: Optional[str] = None):
         ct_dataset = CTDataSet(self.data_dir)
         ct_len = len(ct_dataset)
-        portions = [0.8, 0.1, 0.1]
+        portions = [0.8, 0.2, 0.0]
         sizes = [int(portion * ct_len) for portion in portions]
+        if sum(sizes) != ct_len:
+            sizes[0] += ct_len - sum(sizes)
         self.ct_train, self.ct_val, self.ct_test = random_split(ct_dataset, sizes)
 
     def train_dataloader(self):
-        return DataLoader(self.ct_train, batch_size=self.batch_size)
+        return DataLoader(self.ct_train, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.ct_val, batch_size=self.batch_size)
+        return DataLoader(self.ct_val, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.ct_test, batch_size=self.batch_size)
+        return DataLoader(self.ct_test, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def teardown(self, stage: Optional[str] = None):
         pass

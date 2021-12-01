@@ -42,6 +42,8 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 from torch.nn import functional as F
+import loss
+import volume_dataloader
 
 
 def get_conv(dim=3):
@@ -204,6 +206,7 @@ class DownConv(nn.Module):
     A helper Module that performs 2 convolutions and 1 MaxPool.
     A ReLU activation follows each convolution.
     """
+
     def __init__(self, in_channels, out_channels, pooling=True, planar=False, activation='relu',
                  normalization=None, full_norm=True, dim=3, conv_mode='same'):
         super().__init__()
@@ -351,7 +354,7 @@ class UpConv(nn.Module):
 
         if self.merge_mode == 'concat':
             self.conv1 = conv3(
-                2*self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding
+                2 * self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding
             )
         else:
             # num of input channels to conv2 is same
@@ -417,6 +420,7 @@ class ResizeConv(nn.Module):
     - https://distill.pub/2016/deconv-checkerboard/
     - https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/issues/190
     """
+
     def __init__(self, in_channels, out_channels, kernel_size=3, planar=False, dim=3,
                  upsampling_mode='nearest'):
         super().__init__()
@@ -453,15 +457,20 @@ class GridAttention(nn.Module):
     """Based on https://github.com/ozan-oktay/Attention-Gated-Networks
 
     Published in https://arxiv.org/abs/1804.03999"""
+
+    # noinspection PyTypeChecker
     def __init__(self, in_channels, gating_channels, inter_channels=None, dim=3, sub_sample_factor=2):
         super().__init__()
 
         assert dim in [2, 3]
 
         # Downsampling rate for the input featuremap
-        if isinstance(sub_sample_factor, tuple): self.sub_sample_factor = sub_sample_factor
-        elif isinstance(sub_sample_factor, list): self.sub_sample_factor = tuple(sub_sample_factor)
-        else: self.sub_sample_factor = tuple([sub_sample_factor]) * dim
+        if isinstance(sub_sample_factor, tuple):
+            self.sub_sample_factor = sub_sample_factor
+        elif isinstance(sub_sample_factor, list):
+            self.sub_sample_factor = tuple(sub_sample_factor)
+        else:
+            self.sub_sample_factor = tuple([sub_sample_factor]) * dim
 
         # Default parameter set
         self.dim = dim
@@ -538,6 +547,7 @@ class GridAttention(nn.Module):
             elif classname.find('BatchNorm') != -1:
                 nn.init.normal_(m.weight.data, 1.0, 0.02)
                 nn.init.constant_(m.bias.data, 0.0)
+
         self.apply(weight_init)
 
 
@@ -752,6 +762,7 @@ class UNet(pl.LightningModule):
                 and inference not on small patches, but on complete images in
                 a single step.
     """
+
     def __init__(
             self,
             in_channels: int = 1,
@@ -768,6 +779,9 @@ class UNet(pl.LightningModule):
             full_norm: bool = True,
             dim: int = 3,
             conv_mode: str = 'same',
+            loss_alpha: float = .5,
+            loss_beta: float = .5,
+            loss_gamma: float = 1.0
     ):
         super().__init__()
 
@@ -822,6 +836,9 @@ class UNet(pl.LightningModule):
         self.conv_mode = conv_mode
         self.activation = activation
         self.dim = dim
+        self.loss_alpha = loss_alpha
+        self.loss_beta = loss_beta
+        self.loss_gamma = loss_gamma
 
         self.down_convs = nn.ModuleList()
         self.up_convs = nn.ModuleList()
@@ -839,7 +856,7 @@ class UNet(pl.LightningModule):
         # create the encoder pathway and add to a list
         for i in range(n_blocks):
             ins = self.in_channels if i == 0 else outs
-            outs = self.start_filts * (2**i)
+            outs = self.start_filts * (2 ** i)
             pooling = True if i < n_blocks - 1 else False
             planar = i in self.planar_blocks
 
@@ -882,6 +899,7 @@ class UNet(pl.LightningModule):
 
         self.apply(self.weight_init)
 
+
     @staticmethod
     def weight_init(m):
         if isinstance(m, GridAttention):
@@ -904,7 +922,7 @@ class UNet(pl.LightningModule):
         # Decoding by UpConv and merging with saved outputs of encoder
         i = 0
         for module in self.up_convs:
-            before_pool = encoder_outs[-(i+2)]
+            before_pool = encoder_outs[-(i + 2)]
             x = module(before_pool, x)
             i += 1
 
@@ -914,6 +932,28 @@ class UNet(pl.LightningModule):
         #  receptive field estimation using fornoxai/receptivefield:
         # self.feature_maps = [x]  # Currently disabled to save memory
         return x
+
+    def focal_tversky_loss(self, inputs, labels):
+        tversky = loss.FocalTverskyLoss()
+        return tversky(inputs, labels, smooth=1, alpha=self.loss_alpha, beta=self.loss_beta, gamma=self.loss_gamma)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self.forward(x)
+        loss = self.focal_tversky_loss(logits, y)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self.forward(x)
+        loss = self.focal_tversky_loss(logits, y)
+        self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
 
     @torch.jit.unused
     def forward_gradcp(self, x):
@@ -927,7 +967,7 @@ class UNet(pl.LightningModule):
             i += 1
         i = 0
         for module in self.up_convs:
-            before_pool = encoder_outs[-(i+2)]
+            before_pool = encoder_outs[-(i + 2)]
             x = checkpoint(module, before_pool, x)
             i += 1
         x = self.conv_final(x)

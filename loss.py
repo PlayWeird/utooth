@@ -17,11 +17,9 @@ class FocalTverskyLoss(nn.Module):
 
     def forward(self, inputs, targets, smooth=1, alpha=ALPHA, beta=BETA, gamma=GAMMA):
         # comment out if your model contains a sigmoid or equivalent activation layer
-        # inputs = sigmoid(inputs)
+        inputs = sigmoid(inputs)
 
         # flatten label and prediction tensors
-        # inputs.view(-1)
-        # targets.view(-1)
         inputs = reshape(inputs, (-1,))
         targets = reshape(targets, (-1,))
 

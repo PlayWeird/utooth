@@ -226,7 +226,6 @@ def split_label_channels(labels_matrix, num_channels=4):
         value_index = np.where(labels_matrix == label)
         zero_matrix[value_index] = 1
         split_matrix.append(zero_matrix)
-    print(np.stack(split_matrix).shape)
     return np.stack(split_matrix)
 
 
