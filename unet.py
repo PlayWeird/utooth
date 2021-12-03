@@ -39,11 +39,14 @@ import itertools
 from typing import Sequence, Union, Tuple, Optional
 import pytorch_lightning as pl
 import torch
-from torch import nn
+from torch import nn, sigmoid
 from torch.utils.checkpoint import checkpoint
+
 from torch.nn import functional as F
+from torchmetrics.functional import iou
+from pytorch_lightning.callbacks import LearningRateMonitor
 import loss
-import volume_dataloader
+from torch import sigmoid
 
 
 def get_conv(dim=3):
@@ -781,9 +784,11 @@ class UNet(pl.LightningModule):
             conv_mode: str = 'same',
             loss_alpha: float = .5,
             loss_beta: float = .5,
-            loss_gamma: float = 1.0
+            loss_gamma: float = 1.0,
+            learning_rate: float = 1e-3
     ):
         super().__init__()
+        self.save_hyperparameters()
 
         if n_blocks < 1:
             raise ValueError('n_blocks must be > 1.')
@@ -839,6 +844,7 @@ class UNet(pl.LightningModule):
         self.loss_alpha = loss_alpha
         self.loss_beta = loss_beta
         self.loss_gamma = loss_gamma
+        self.learning_rate = learning_rate
 
         self.down_convs = nn.ModuleList()
         self.up_convs = nn.ModuleList()
@@ -899,7 +905,6 @@ class UNet(pl.LightningModule):
 
         self.apply(self.weight_init)
 
-
     @staticmethod
     def weight_init(m):
         if isinstance(m, GridAttention):
@@ -942,18 +947,35 @@ class UNet(pl.LightningModule):
         logits = self.forward(x)
         loss = self.focal_tversky_loss(logits, y)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
         loss = self.focal_tversky_loss(logits, y)
-        self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        accu = iou(logits, y.squeeze(1), threshold=0.5)
+        self.log('val_accu', accu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
+        # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,
+        #                                                 max_lr=0.1,
+        #                                                 steps_per_epoch=1,
+        #                                                 epochs=50,
+        #                                                 anneal_strategy='linear')
+        # return {
+        #     'optimizer': optimizer,
+        #     'lr_scheduler': {
+        #         'scheduler': scheduler,
+        #         'interval': 'epoch',
+        #         "frequency": 1,
+        #         'monitor': 'val_loss',
+        #         'name': 'lr'}
+        # }
 
     @torch.jit.unused
     def forward_gradcp(self, x):

@@ -1,12 +1,10 @@
-from functools import lru_cache
-from typing import Optional
 
+from typing import Optional
 import nibabel as nib
 import numpy as np
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, random_split, Dataset
-from torch.utils.data.dataset import T_co
 import glob
 import ct_utils
 
@@ -24,7 +22,7 @@ class CTScanDataModule(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         ct_dataset = CTDataSet(self.data_dir)
         ct_len = len(ct_dataset)
-        portions = [0.8, 0.2, 0.0]
+        portions = [0.9, 0.1, 0.0]
         sizes = [int(portion * ct_len) for portion in portions]
         if sum(sizes) != ct_len:
             sizes[0] += ct_len - sum(sizes)
@@ -57,7 +55,7 @@ class CTDataSet(Dataset):
         nifti_jaw = nib.load(sample['data'])
         jaw = torch.Tensor(np.asarray(nifti_jaw.dataobj))
         nifti_label = nib.load(sample['label'])
-        label = torch.Tensor(np.asarray(nifti_label.dataobj))
+        label = torch.Tensor(np.asarray(nifti_label.dataobj)).type(torch.int16)
         jaw = torch.unsqueeze(jaw, 0)
         label = torch.unsqueeze(label, 0)
         return jaw, label
