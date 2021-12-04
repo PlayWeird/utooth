@@ -783,7 +783,6 @@ class UNet(pl.LightningModule):
             dim: int = 3,
             conv_mode: str = 'same',
             loss_alpha: float = .5,
-            loss_beta: float = .5,
             loss_gamma: float = 1.0,
             learning_rate: float = 1e-3
     ):
@@ -842,7 +841,7 @@ class UNet(pl.LightningModule):
         self.activation = activation
         self.dim = dim
         self.loss_alpha = loss_alpha
-        self.loss_beta = loss_beta
+        self.loss_beta = 1 - loss_alpha
         self.loss_gamma = loss_gamma
         self.learning_rate = learning_rate
 
@@ -945,6 +944,7 @@ class UNet(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
+
         loss = self.focal_tversky_loss(logits, y)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
@@ -953,10 +953,13 @@ class UNet(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
+
         loss = self.focal_tversky_loss(logits, y)
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        accu = iou(logits, y.squeeze(1), threshold=0.5)
+
+        accu = iou(sigmoid(logits), y.squeeze(1), threshold=0.5)
         self.log('val_accu', accu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+
         return loss
 
     def configure_optimizers(self):
@@ -996,94 +999,3 @@ class UNet(pl.LightningModule):
         # self.feature_maps = [x]  # Currently disabled to save memory
         return x
 
-
-def test_model(
-        batch_size=1,
-        in_channels=1,
-        out_channels=2,
-        n_blocks=3,
-        planar_blocks=(),
-        merge_mode='concat',
-        dim=3
-):
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model = UNet(
-        in_channels=in_channels,
-        out_channels=out_channels,
-        n_blocks=n_blocks,
-        planar_blocks=planar_blocks,
-        merge_mode=merge_mode,
-        dim=dim,
-    ).to(device)
-
-    # Minimal test input
-    if dim == 3:
-        # Each block in the encoder pathway ends with 2x2x2 downsampling, except
-        # planar blocks, which only do 1x2x2 downsampling, so the input has to
-        # be larger when using more blocks.
-        x = torch.randn(
-            batch_size,
-            in_channels,
-            2 ** n_blocks // (2 ** len(planar_blocks)),
-            2 ** n_blocks,
-            2 ** n_blocks,
-            device=device
-        )
-        expected_out_shape = (
-            batch_size,
-            out_channels,
-            2 ** n_blocks // (2 ** len(planar_blocks)),
-            2 ** n_blocks,
-            2 ** n_blocks
-        )
-    elif dim == 2:
-        # Each block in the encoder pathway ends with 2x2 downsampling
-        # so the input has to be larger when using more blocks.
-        x = torch.randn(
-            batch_size,
-            in_channels,
-            2 ** n_blocks,
-            2 ** n_blocks,
-            device=device
-        )
-        expected_out_shape = (
-            batch_size,
-            out_channels,
-            2 ** n_blocks,
-            2 ** n_blocks
-        )
-
-    # Test forward, autograd, and backward pass with test input
-    out = model(x)
-    loss = torch.sum(out)
-    loss.backward()
-    assert out.shape == expected_out_shape
-
-
-def test_2d_config(max_n_blocks=4):
-    for n_blocks in range(1, max_n_blocks + 1):
-        print(f'Testing 2D U-Net with n_blocks = {n_blocks}...')
-        test_model(n_blocks=n_blocks, dim=2)
-
-
-def test_planar_configs(max_n_blocks=4):
-    for n_blocks in range(1, max_n_blocks + 1):
-        planar_combinations = itertools.chain(*[
-            list(itertools.combinations(range(n_blocks), i))
-            for i in range(n_blocks + 1)
-        ])  # [(), (0,), (1,), ..., (0, 1), ..., (0, 1, 2, ..., n_blocks - 1)]
-
-        for p in planar_combinations:
-            print(f'Testing 3D U-Net with n_blocks = {n_blocks}, planar_blocks = {p}...')
-            test_model(n_blocks=n_blocks, planar_blocks=p)
-
-
-if __name__ == '__main__':
-    # m = UNet3dLite()
-    # x = torch.randn(1, 1, 22, 140, 140)
-    # m(x)
-    test_2d_config()
-    print()
-    test_planar_configs()
-    print('All tests sucessful!')
-    # # TODO: Also test valid convolution architecture.
