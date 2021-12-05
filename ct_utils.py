@@ -212,8 +212,13 @@ def get_sample_label_id(sample_path, is_nifti_dataset=False):
     else:
         if not is_nifti_dataset:
             sample_label_paths.reverse()
-
-    sample = {'data': sample_label_paths[0], 'label': sample_label_paths[1], 'id': id}
+    if 'label' in sample_label_paths[0]:
+        label_idx = 0
+        data_idx = 1
+    else:
+        label_idx = 1
+        data_idx = 0
+    sample = {'data': sample_label_paths[data_idx], 'label': sample_label_paths[label_idx], 'id': id}
     return sample
 
 

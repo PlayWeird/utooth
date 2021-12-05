@@ -965,20 +965,6 @@ class UNet(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
-        # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,
-        #                                                 max_lr=0.1,
-        #                                                 steps_per_epoch=1,
-        #                                                 epochs=50,
-        #                                                 anneal_strategy='linear')
-        # return {
-        #     'optimizer': optimizer,
-        #     'lr_scheduler': {
-        #         'scheduler': scheduler,
-        #         'interval': 'epoch',
-        #         "frequency": 1,
-        #         'monitor': 'val_loss',
-        #         'name': 'lr'}
-        # }
 
     @torch.jit.unused
     def forward_gradcp(self, x):

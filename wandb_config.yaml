@@ -1,0 +1,29 @@
+method: random
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  attention:
+    value: false
+  batch_size:
+    value: 5
+  dim:
+    value: 3
+  in_channels:
+    value: 1
+  learning_rate:
+    distribution: uniform
+    max: 0.01
+    min: 1.0e-05
+  loss_alpha:
+    distribution: uniform
+    max: 1.0
+    min: 0.1
+  loss_gamma:
+    distribution: uniform
+    max: 3.0
+    min: 0.1
+  max_epochs:
+    value: 50
+  out_channels:
+    value: 4
