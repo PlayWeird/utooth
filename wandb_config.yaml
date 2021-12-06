@@ -1,4 +1,4 @@
-method: random
+method: bayes
 metric:
   goal: minimize
   name: val_loss
@@ -18,11 +18,11 @@ parameters:
   loss_alpha:
     distribution: uniform
     max: 1.0
-    min: 0.1
+    min: 0.01
   loss_gamma:
     distribution: uniform
-    max: 3.0
-    min: 0.1
+    max: 8.0
+    min: 1.0
   max_epochs:
     value: 50
   out_channels:

@@ -81,7 +81,7 @@ def plot_3d(image, threshold=0, transpose=[0, 1, 2], step_size=2):
     plt.show()
 
 
-def plot_3d_with_labels(image, labels, threshold=0, transpose=[0, 1, 2], step_size=2):
+def plot_3d_with_labels(image, labels, threshold=0, transpose=[0, 1, 2], step_size=2, show=True):
     # perform a image transformation
     # transpose = [2, 1, 0] for upright sample
     p = image.transpose(*transpose)
@@ -104,7 +104,9 @@ def plot_3d_with_labels(image, labels, threshold=0, transpose=[0, 1, 2], step_si
     ax.set_xlim(0, p.shape[0])
     ax.set_ylim(0, p.shape[1])
     ax.set_zlim(0, p.shape[2])
-    plt.show()
+    if show:
+        plt.show()
+    return ax
 
 
 def make_gifs(ctvol, outprefix, chosen_views):
