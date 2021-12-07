@@ -161,7 +161,7 @@ class UNet(pl.LightningModule):
             accuracy than 'add' in typical medical image segmentation
             tasks.
         planar_blocks: Each number i in this sequence leads to the i-th
-            block being a "planar" block. This means that all image
+          Tversky = (1 - Tversky) ** gamma  block being a "planar" block. This means that all image
             operations performed in the i-th block in the encoder pathway
             and its corresponding decoder counterpart disregard the depth
             (`D`) axis and only operate in 2D (`H`, `W`).
@@ -464,7 +464,7 @@ class UNet(pl.LightningModule):
             jaw_image = ct_utils.plot_3d_with_labels(sample, logits, threshold=1200, transpose=[2, 1, 0], step_size=2, show=False)
             log_image = wandb.Image(jaw_image, caption=f'Batch_ID: {batch_idx}')
             wandb.log({'Val_Image': log_image})
-        except (RuntimeError, TypeError, NameError):
+        except (RuntimeError, TypeError, NameError, ValueError):
             print("This is the NO POLYGONS TO PRINT error...FIX THIS")
         plt.close('all')
 
