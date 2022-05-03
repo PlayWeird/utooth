@@ -1,4 +1,4 @@
-# ct-volume-preprocessing
+# Utooth Semantic Segmentation
 
 ct-volume-preprocessing includes:
 * preprocess_volumes.py, an end-to-end Python
