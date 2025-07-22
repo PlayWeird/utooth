@@ -43,7 +43,7 @@ from numpy import where
 from torch import nn, sigmoid, where
 from torch.utils.checkpoint import checkpoint
 from torch.nn import functional as F
-from torchmetrics.functional import iou
+from torchmetrics.functional import jaccard_index
 import matplotlib.pyplot as plt
 from pytorch_lightning.callbacks import LearningRateMonitor
 
@@ -450,7 +450,7 @@ class UNet(pl.LightningModule):
         loss = self.focal_tversky_loss(logits, y)
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-        accu = iou(sigmoid(logits), y.squeeze(1), threshold=0.5)
+        accu = jaccard_index(sigmoid(logits), y.squeeze(1), task='multiclass', num_classes=4, threshold=0.5)
         self.log('val_accu', accu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
         # Log a visualization
