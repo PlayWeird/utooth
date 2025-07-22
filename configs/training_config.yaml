@@ -1,0 +1,67 @@
+# uTooth Training Configuration
+# Default configuration for full production training
+
+# Data Configuration
+data:
+  path: "/home/gaetano/utooth/DATA/"
+  batch_size: 5
+
+# Model Configuration
+model:
+  in_channels: 1
+  out_channels: 4
+  n_blocks: 4
+  start_filters: 32
+  activation: "relu"
+  normalization: "batch"
+  conv_mode: "same"
+  dim: 3
+  attention: false
+
+# Training Configuration
+training:
+  max_epochs: 50
+  learning_rate: 0.002
+  loss_alpha: 0.5236
+  loss_gamma: 1.0
+  
+# Cross-Validation Configuration
+cross_validation:
+  n_folds: 5
+  random_seed: 42
+
+# Callbacks Configuration
+callbacks:
+  early_stopping:
+    enabled: true
+    patience: 10
+    monitor: "val_loss"
+    mode: "min"
+  
+  model_checkpoint:
+    save_top_k: 3
+    save_last: true
+    monitor: "val_loss"
+    mode: "min"
+
+# Logging Configuration
+logging:
+  csv_logger: true
+  wandb:
+    enabled: false
+    project: "utooth_kfold"
+    tags: ["production", "5fold_cv"]
+
+# Hardware Configuration
+hardware:
+  accelerator: "gpu"
+  devices: 1
+  strategy: "auto"
+  deterministic: true
+
+# Output Configuration
+output:
+  base_dir: "outputs"
+  save_metrics: true
+  save_config: true
+  generate_report: true
