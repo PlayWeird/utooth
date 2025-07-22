@@ -85,22 +85,96 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Training with Jupyter Notebook
+### Production Training (Recommended)
+
+**Full 5-fold cross-validation training with Weights & Biases logging:**
+```bash
+python scripts/train.py \
+  --experiment_name production_v1 \
+  --use_wandb \
+  --max_epochs 50 \
+  --n_folds 5
+```
+
+This will train for ~2-3 hours with:
+- 5-fold cross-validation (48 samples: ~38 train, ~10 validation per fold)
+- 50 epochs per fold with early stopping
+- Comprehensive statistics and reporting
+- Resume capability if interrupted
+
+### Quick Validation Test
+```bash
+# Test that everything works (2 epochs, 2 folds)
+python scripts/train.py --test_run --experiment_name validation_test
+```
+
+### Resume Interrupted Training
+```bash
+# Resume from latest checkpoint
+python scripts/train.py --resume --experiment_name production_v1 --use_wandb
+
+# Auto-resume without confirmation
+python scripts/train.py --auto_resume --experiment_name production_v1 --use_wandb
+```
+
+### Monitor Training Progress
+```bash
+# List all experiments
+python scripts/monitor_training.py list
+
+# Monitor specific experiment (real-time updates)
+python scripts/monitor_training.py monitor --experiment production_v1
+
+# Show detailed experiment information
+python scripts/monitor_training.py details --experiment production_v1
+
+# Get resume instructions
+python scripts/monitor_training.py resume --experiment production_v1
+```
+
+### Alternative Training Methods
+
+#### Using Shell Script
+```bash
+# Full training
+./scripts/run_training.sh --wandb --experiment-name production_v1
+
+# Test mode
+./scripts/run_training.sh --test
+
+# Resume training
+./scripts/run_training.sh --resume --wandb --experiment-name production_v1
+```
+
+#### Training with Jupyter Notebook
 ```bash
 cd notebooks
 jupyter notebook unet_trainer.ipynb
 ```
 
-### Training with Script
+#### Custom Configuration
 ```bash
-python scripts/train.py --data_path DATA/ --batch_size 5 --max_epochs 50
+# Custom hyperparameters
+python scripts/train.py \
+  --experiment_name custom_config \
+  --max_epochs 100 \
+  --batch_size 3 \
+  --n_folds 10 \
+  --random_seed 123 \
+  --use_wandb
 ```
 
-### Hyperparameter Optimization
+#### Hyperparameter Optimization
 ```bash
 cd notebooks
 jupyter notebook sweeps.ipynb
 ```
+
+### Expected Results
+- **Training Time**: ~2-3 hours for full 5-fold CV (RTX 3080 Ti)
+- **Validation Loss**: ~0.098 (Focal Tversky Loss)
+- **IoU Accuracy**: ~91.3%
+- **Output Location**: `outputs/runs/EXPERIMENT_NAME/`
 
 ## Recent Updates
 
