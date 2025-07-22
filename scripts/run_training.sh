@@ -25,6 +25,9 @@ echo "======================================================"
 TEST_RUN=false
 EXPERIMENT_NAME=""
 USE_WANDB=false
+RESUME=false
+AUTO_RESUME=false
+FORCE_RESTART=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -40,12 +43,28 @@ while [[ $# -gt 0 ]]; do
             USE_WANDB=true
             shift
             ;;
+        --resume)
+            RESUME=true
+            shift
+            ;;
+        --auto-resume)
+            AUTO_RESUME=true
+            RESUME=true
+            shift
+            ;;
+        --force-restart)
+            FORCE_RESTART=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--test] [--experiment-name NAME] [--wandb]"
+            echo "Usage: $0 [--test] [--experiment-name NAME] [--wandb] [--resume] [--auto-resume] [--force-restart]"
             echo "  --test: Run with 2 epochs for testing"
             echo "  --experiment-name: Name for this experiment"
             echo "  --wandb: Enable Weights & Biases logging"
+            echo "  --resume: Resume from latest checkpoints"
+            echo "  --auto-resume: Resume automatically without confirmation"
+            echo "  --force-restart: Force restart even if checkpoints exist"
             exit 1
             ;;
     esac
@@ -66,6 +85,21 @@ if [ "$USE_WANDB" = true ]; then
     echo "Weights & Biases logging: ENABLED"
 else
     echo "Weights & Biases logging: DISABLED"
+fi
+
+if [ "$RESUME" = true ]; then
+    CMD="$CMD --resume"
+    echo "Resume mode: ENABLED"
+fi
+
+if [ "$AUTO_RESUME" = true ]; then
+    CMD="$CMD --auto_resume"
+    echo "Auto-resume mode: ENABLED"
+fi
+
+if [ "$FORCE_RESTART" = true ]; then
+    CMD="$CMD --force_restart"
+    echo "Force restart mode: ENABLED"
 fi
 
 if [ -n "$EXPERIMENT_NAME" ]; then

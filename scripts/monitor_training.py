@@ -16,6 +16,7 @@ def get_experiment_status(run_dir):
     """Get the status of a training experiment"""
     config_path = os.path.join(run_dir, 'config.json')
     results_path = os.path.join(run_dir, 'results_summary.json')
+    state_path = os.path.join(run_dir, 'experiment_state.json')
     
     if not os.path.exists(config_path):
         return None
@@ -30,15 +31,39 @@ def get_experiment_status(run_dir):
         'n_folds': config.get('n_folds', 5),
         'status': 'running',
         'completed_folds': 0,
-        'progress': 0.0
+        'failed_folds': 0,
+        'current_fold': None,
+        'resume_count': config.get('resume_count', 0),
+        'progress': 0.0,
+        'can_resume': False
     }
     
-    # Check for completed folds
-    fold_stats_dir = os.path.join(run_dir, 'fold_statistics')
-    if os.path.exists(fold_stats_dir):
-        completed_folds = len([f for f in os.listdir(fold_stats_dir) if f.endswith('_stats.json')])
-        status['completed_folds'] = completed_folds
-        status['progress'] = completed_folds / config.get('n_folds', 5) * 100
+    # Check experiment state
+    if os.path.exists(state_path):
+        with open(state_path, 'r') as f:
+            state = json.load(f)
+            status['completed_folds'] = len(state.get('completed_folds', []))
+            status['failed_folds'] = len(state.get('failed_folds', []))
+            status['current_fold'] = state.get('current_fold')
+            status['resume_count'] = state.get('resume_count', 0)
+            status['status'] = state.get('status', 'running')
+            
+            # Check if experiment can be resumed
+            if status['status'] in ['running', 'interrupted'] and status['completed_folds'] < status['n_folds']:
+                status['can_resume'] = True
+    
+    # Calculate progress
+    if status['completed_folds'] > 0:
+        status['progress'] = status['completed_folds'] / status['n_folds'] * 100
+    
+    # Check for checkpoint availability
+    checkpoints_dir = os.path.join(run_dir, 'checkpoints')
+    if os.path.exists(checkpoints_dir):
+        for fold_idx in range(status['n_folds']):
+            fold_ckpt_dir = os.path.join(checkpoints_dir, f'fold_{fold_idx}')
+            if os.path.exists(fold_ckpt_dir) and os.listdir(fold_ckpt_dir):
+                status['can_resume'] = True
+                break
     
     # Check if fully completed
     if os.path.exists(results_path):
@@ -73,15 +98,16 @@ def list_experiments():
     # Sort by start time (newest first)
     experiments.sort(key=lambda x: x.get('start_time', ''), reverse=True)
     
-    print(f"{'Experiment Name':<30} {'Status':<12} {'Progress':<10} {'Mean Val Loss':<15} {'Start Time':<20}")
-    print("-" * 100)
+    print(f"{'Experiment Name':<30} {'Status':<12} {'Progress':<10} {'Resume':<8} {'Mean Val Loss':<15} {'Start Time':<20}")
+    print("-" * 108)
     
     for exp in experiments:
         mean_loss = f"{exp.get('mean_val_loss', 'N/A'):.4f}" if exp.get('mean_val_loss') else 'N/A'
         start_time = exp.get('start_time', 'Unknown')[:16].replace('T', ' ')
         progress = f"{exp['progress']:.1f}%"
         
-        print(f"{exp['experiment_name']:<30} {exp['status']:<12} {progress:<10} {mean_loss:<15} {start_time:<20}")
+        can_resume = '✅' if exp.get('can_resume', False) else '❌'
+        print(f"{exp['experiment_name']:<30} {exp['status']:<12} {progress:<10} {can_resume:<8} {mean_loss:<15} {start_time:<20}")
 
 def monitor_experiment(experiment_name, refresh_interval=10):
     """Monitor a specific experiment"""
@@ -176,12 +202,47 @@ def show_experiment_details(experiment_name):
                       f"Best Epoch = {fold_result['best_epoch']}, "
                       f"Time = {fold_result['training_time_seconds']/60:.1f} min")
 
+def resume_experiment(experiment_name):
+    """Show how to resume an experiment"""
+    run_dir = f"outputs/runs/{experiment_name}"
+    
+    if not os.path.exists(run_dir):
+        print(f"Experiment '{experiment_name}' not found.")
+        return
+    
+    status = get_experiment_status(run_dir)
+    if not status:
+        print("Could not read experiment status.")
+        return
+    
+    if not status['can_resume']:
+        print(f"Experiment '{experiment_name}' cannot be resumed.")
+        print(f"Status: {status['status']}")
+        if status['status'] == 'completed':
+            print("Experiment is already completed.")
+        return
+    
+    print(f"Experiment '{experiment_name}' can be resumed:")
+    print(f"  Status: {status['status']}")
+    print(f"  Progress: {status['progress']:.1f}% ({status['completed_folds']}/{status['n_folds']} folds)")
+    if status['current_fold'] is not None:
+        print(f"  Current fold: {status['current_fold'] + 1}")
+    if status['failed_folds'] > 0:
+        print(f"  Failed folds: {status['failed_folds']}")
+    if status['resume_count'] > 0:
+        print(f"  Previous resumes: {status['resume_count']}")
+    
+    print(f"\nTo resume this experiment, run:")
+    print(f"  python scripts/train.py --resume --experiment_name {experiment_name}")
+    print(f"\nOr to auto-resume without confirmation:")
+    print(f"  python scripts/train.py --auto_resume --experiment_name {experiment_name}")
+
 def main():
     parser = argparse.ArgumentParser(description='Monitor uTooth training experiments')
-    parser.add_argument('command', choices=['list', 'monitor', 'details'], 
+    parser.add_argument('command', choices=['list', 'monitor', 'details', 'resume'], 
                         help='Command to execute')
     parser.add_argument('--experiment', '-e', type=str, 
-                        help='Experiment name (for monitor/details commands)')
+                        help='Experiment name (for monitor/details/resume commands)')
     parser.add_argument('--refresh', '-r', type=int, default=10,
                         help='Refresh interval in seconds (for monitor command)')
     
@@ -199,6 +260,11 @@ def main():
             print("Error: --experiment is required for details command")
             return
         show_experiment_details(args.experiment)
+    elif args.command == 'resume':
+        if not args.experiment:
+            print("Error: --experiment is required for resume command")
+            return
+        resume_experiment(args.experiment)
 
 if __name__ == "__main__":
     main()

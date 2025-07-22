@@ -42,12 +42,64 @@ def create_fold_indices(data_path, n_folds=5, random_seed=42):
     return list(kfold.split(indices))
 
 
+def find_latest_checkpoint(checkpoint_dir):
+    """Find the latest checkpoint in a directory"""
+    if not os.path.exists(checkpoint_dir):
+        return None
+    
+    # Look for last.ckpt first (most recent)
+    last_ckpt = os.path.join(checkpoint_dir, 'last.ckpt')
+    if os.path.exists(last_ckpt):
+        return last_ckpt
+    
+    # Look for best checkpoint files
+    ckpt_files = [f for f in os.listdir(checkpoint_dir) if f.endswith('.ckpt') and f != 'last.ckpt']
+    if not ckpt_files:
+        return None
+    
+    # Sort by modification time (newest first)
+    ckpt_files.sort(key=lambda x: os.path.getmtime(os.path.join(checkpoint_dir, x)), reverse=True)
+    return os.path.join(checkpoint_dir, ckpt_files[0])
+
 def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
     """Train a single fold"""
     print(f"\n{'='*50}")
     print(f"Training Fold {fold_idx + 1}/{args.n_folds}")
     print(f"Train samples: {len(train_indices)}, Val samples: {len(val_indices)}")
     print(f"{'='*50}\n")
+    
+    # Check for existing checkpoint to resume from
+    checkpoint_dir = os.path.join(run_dir, 'checkpoints', f'fold_{fold_idx}')
+    resume_from_checkpoint = None
+    
+    if args.resume and os.path.exists(checkpoint_dir):
+        resume_from_checkpoint = find_latest_checkpoint(checkpoint_dir)
+        if resume_from_checkpoint:
+            print(f"🔄 Resuming from checkpoint: {resume_from_checkpoint}")
+        else:
+            print("⚠️  No checkpoint found to resume from, starting fresh")
+    elif os.path.exists(checkpoint_dir) and not args.force_restart:
+        # Check if this fold was already completed
+        fold_stats_path = os.path.join(run_dir, 'fold_statistics', f'fold_{fold_idx}_stats.json')
+        if os.path.exists(fold_stats_path):
+            print(f"✅ Fold {fold_idx + 1} already completed, skipping...")
+            # Load and return existing stats
+            with open(fold_stats_path, 'r') as f:
+                return json.load(f)
+        
+        # Offer to resume if checkpoint exists
+        resume_from_checkpoint = find_latest_checkpoint(checkpoint_dir)
+        if resume_from_checkpoint and not args.no_resume:
+            print(f"📁 Found existing checkpoint: {resume_from_checkpoint}")
+            if not args.auto_resume:
+                response = input("Resume from this checkpoint? [Y/n]: ").strip().lower()
+                if response in ['', 'y', 'yes']:
+                    resume_from_checkpoint = resume_from_checkpoint
+                else:
+                    resume_from_checkpoint = None
+                    print("🔄 Starting fresh (existing checkpoints will be overwritten)")
+            else:
+                print("🔄 Auto-resuming from checkpoint")
     
     # Start timing
     fold_start_time = time.time()
@@ -138,8 +190,8 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
         default_root_dir=run_dir
     )
     
-    # Train the model
-    trainer.fit(model, dataset)
+    # Train the model (with optional resume)
+    trainer.fit(model, dataset, ckpt_path=resume_from_checkpoint)
     
     # Calculate training time
     fold_train_time = time.time() - fold_start_time
@@ -194,6 +246,14 @@ def main():
                         help='Disable early stopping')
     parser.add_argument('--experiment_name', type=str, default=None,
                         help='Name for this experiment run')
+    parser.add_argument('--resume', action='store_true',
+                        help='Resume training from the latest checkpoint')
+    parser.add_argument('--auto_resume', action='store_true',
+                        help='Automatically resume without asking for confirmation')
+    parser.add_argument('--force_restart', action='store_true',
+                        help='Force restart training even if checkpoints exist')
+    parser.add_argument('--no_resume', action='store_true',
+                        help='Never attempt to resume, always start fresh')
     
     args = parser.parse_args()
     
@@ -210,12 +270,60 @@ def main():
     run_dir = os.path.join('outputs', 'runs', args.experiment_name)
     os.makedirs(run_dir, exist_ok=True)
     
-    # Save configuration
-    config = vars(args)
-    config['start_time'] = datetime.now().isoformat()
+    # Check for existing experiment
     config_path = os.path.join(run_dir, 'config.json')
+    experiment_state_path = os.path.join(run_dir, 'experiment_state.json')
+    
+    existing_config = None
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            existing_config = json.load(f)
+        
+        if not args.force_restart and not args.resume:
+            print(f"\n⚠️  Experiment '{args.experiment_name}' already exists!")
+            print(f"Started: {existing_config.get('start_time', 'Unknown')}")
+            if not args.auto_resume:
+                print("Options:")
+                print("  --resume: Resume from latest checkpoints")
+                print("  --force_restart: Start completely fresh")
+                response = input("Resume existing experiment? [Y/n]: ").strip().lower()
+                if response in ['', 'y', 'yes']:
+                    args.resume = True
+                else:
+                    args.force_restart = True
+            else:
+                args.resume = True
+    
+    # Initialize or load experiment state
+    experiment_state = {
+        'experiment_name': args.experiment_name,
+        'total_folds': args.n_folds,
+        'completed_folds': [],
+        'failed_folds': [],
+        'current_fold': None,
+        'start_time': existing_config['start_time'] if existing_config else datetime.now().isoformat(),
+        'last_update': datetime.now().isoformat(),
+        'status': 'running',
+        'resume_count': 0
+    }
+    
+    if os.path.exists(experiment_state_path) and not args.force_restart:
+        with open(experiment_state_path, 'r') as f:
+            experiment_state.update(json.load(f))
+        experiment_state['resume_count'] += 1
+        experiment_state['last_update'] = datetime.now().isoformat()
+        print(f"🔄 Resuming experiment (resume #{experiment_state['resume_count']})")
+    
+    # Save configuration (preserve original start_time if resuming)
+    config = vars(args)
+    config['start_time'] = experiment_state['start_time']
+    config['resume_count'] = experiment_state['resume_count']
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=2)
+    
+    # Save experiment state
+    with open(experiment_state_path, 'w') as f:
+        json.dump(experiment_state, f, indent=2)
     
     print(f"\nExperiment: {args.experiment_name}")
     print(f"Results will be saved to: {run_dir}")
@@ -234,13 +342,49 @@ def main():
     fold_results = []
     overall_start_time = time.time()
     
+    # Skip already completed folds if resuming
+    start_fold = 0
+    if args.resume and experiment_state['completed_folds']:
+        completed_fold_indices = [f['fold_idx'] for f in experiment_state['completed_folds']]
+        start_fold = max(completed_fold_indices) + 1 if completed_fold_indices else 0
+        fold_results = experiment_state['completed_folds']
+        print(f"📁 Skipping {len(completed_fold_indices)} already completed folds")
+    
     for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
-        fold_stats = train_fold(fold_idx, train_indices, val_indices, args.data_path, args, run_dir)
-        fold_results.append(fold_stats)
-        print(f"\nFold {fold_idx + 1} completed:")
-        print(f"  Best validation loss: {fold_stats['best_val_loss']:.4f}")
-        print(f"  Training time: {fold_stats['training_time_seconds']/60:.1f} minutes")
-        print(f"  Early stopped: {fold_stats['early_stopped']}")
+        if fold_idx < start_fold:
+            continue
+            
+        # Update experiment state
+        experiment_state['current_fold'] = fold_idx
+        experiment_state['last_update'] = datetime.now().isoformat()
+        with open(experiment_state_path, 'w') as f:
+            json.dump(experiment_state, f, indent=2)
+        
+        try:
+            fold_stats = train_fold(fold_idx, train_indices, val_indices, args.data_path, args, run_dir)
+            fold_results.append(fold_stats)
+            
+            # Update experiment state with completed fold
+            experiment_state['completed_folds'].append(fold_stats)
+            experiment_state['current_fold'] = None
+            if fold_idx in experiment_state.get('failed_folds', []):
+                experiment_state['failed_folds'].remove(fold_idx)
+            
+            print(f"\nFold {fold_idx + 1} completed:")
+            print(f"  Best validation loss: {fold_stats['best_val_loss']:.4f}")
+            print(f"  Training time: {fold_stats['training_time_seconds']/60:.1f} minutes")
+            print(f"  Early stopped: {fold_stats['early_stopped']}")
+            
+        except Exception as e:
+            print(f"\n❌ Fold {fold_idx + 1} failed with error: {str(e)}")
+            experiment_state['failed_folds'].append(fold_idx)
+            experiment_state['current_fold'] = None
+            raise e
+        finally:
+            # Always update experiment state
+            experiment_state['last_update'] = datetime.now().isoformat()
+            with open(experiment_state_path, 'w') as f:
+                json.dump(experiment_state, f, indent=2)
     
     # Calculate overall statistics
     total_time = time.time() - overall_start_time
@@ -259,18 +403,27 @@ def main():
     print(f"Total training time: {total_time/3600:.2f} hours")
     print(f"{'='*70}")
     
+    # Mark experiment as completed
+    experiment_state['status'] = 'completed'
+    experiment_state['completed_at'] = datetime.now().isoformat()
+    experiment_state['current_fold'] = None
+    with open(experiment_state_path, 'w') as f:
+        json.dump(experiment_state, f, indent=2)
+    
     # Save overall results
     overall_results = {
         'experiment_name': args.experiment_name,
         'config': config,
         'fold_results': fold_results,
+        'experiment_state': experiment_state,
         'summary': {
             'mean_val_loss': float(np.mean(val_losses)),
             'std_val_loss': float(np.std(val_losses)),
             'min_val_loss': float(np.min(val_losses)),
             'max_val_loss': float(np.max(val_losses)),
             'total_training_time_hours': total_time/3600,
-            'completed_at': datetime.now().isoformat()
+            'completed_at': datetime.now().isoformat(),
+            'resume_count': experiment_state['resume_count']
         }
     }
     
