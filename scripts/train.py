@@ -12,12 +12,15 @@ import torch
 from torch import sigmoid, where, cuda
 from sklearn.model_selection import KFold
 
-from volume_dataloader_kfold import CTScanDataModuleKFold
-from unet import UNet
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.data.volume_dataloader_kfold import CTScanDataModuleKFold
+from src.models.unet import UNet
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-import ct_utils
+import src.utils.ct_utils as ct_utils
 
 
 def create_fold_indices(data_path, n_folds=5, random_seed=42):
@@ -70,7 +73,7 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args):
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
     checkpoint = ModelCheckpoint(
         monitor='val_loss',
-        dirpath=f'checkpoints/fold_{fold_idx}',
+        dirpath=f'outputs/checkpoints/fold_{fold_idx}',
         filename='utooth-{epoch:02d}-{val_loss:.4f}',
         save_top_k=1,
         mode='min'

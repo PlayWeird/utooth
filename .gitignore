@@ -113,6 +113,14 @@ wandb/
 *.pth
 *.pt
 
+# PyTorch Lightning logs
+lightning_logs/
+
+# Script-generated outputs
+outputs/
+checkpoints/
+utooth/
+
 # IDE files
 .vscode/
 .idea/

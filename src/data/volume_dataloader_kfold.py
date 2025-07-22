@@ -9,8 +9,8 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, Subset, Dataset
 import glob
-import ct_utils
-from volume_dataloader import CTDataSet
+from ..utils import ct_utils
+from .volume_dataloader import CTDataSet
 
 
 class CTScanDataModuleKFold(pl.LightningDataModule):

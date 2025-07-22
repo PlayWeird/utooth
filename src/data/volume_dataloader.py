@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, random_split, Dataset
 import glob
-import ct_utils
+from ..utils import ct_utils
 
 
 class CTScanDataModule(pl.LightningDataModule):

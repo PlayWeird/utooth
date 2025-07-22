@@ -44,11 +44,13 @@ from torch import nn, sigmoid, where
 from torch.utils.checkpoint import checkpoint
 from torch.nn import functional as F
 from torchmetrics.functional import jaccard_index
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from pytorch_lightning.callbacks import LearningRateMonitor
 
-import ct_utils
-import loss
+from ..utils import ct_utils
+from ..losses import loss
 from torch import sigmoid
 import wandb
 
