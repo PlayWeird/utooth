@@ -118,6 +118,10 @@ lightning_logs/
 
 # Script-generated outputs
 outputs/
+!outputs/runs/
+!outputs/runs/*/
+!outputs/runs/*/results_summary.*
+!outputs/runs/*/training_report.md
 checkpoints/
 utooth/
 

@@ -462,12 +462,13 @@ class UNet(pl.LightningModule):
         logits = logits.squeeze(0)
         logits = where(logits > 0.5, 1, 0).cpu().numpy()
         logits = logits.sum(axis=0)
-        try:
-            jaw_image = ct_utils.plot_3d_with_labels(sample, logits, threshold=1200, transpose=[2, 1, 0], step_size=2, show=False)
-            log_image = wandb.Image(jaw_image, caption=f'Epoch: {self.current_epoch}')
-            wandb.log({'Validation Image': log_image})
-        except Exception as e:
-            print("This is the NO POLYGONS TO PRINT error...FIX THIS")
+        # Commenting out wandb image logging for now
+        # try:
+        #     jaw_image = ct_utils.plot_3d_with_labels(sample, logits, threshold=1200, transpose=[2, 1, 0], step_size=2, show=False)
+        #     log_image = wandb.Image(jaw_image, caption=f'Epoch: {self.current_epoch}')
+        #     wandb.log({'Validation Image': log_image})
+        # except Exception as e:
+        #     print("This is the NO POLYGONS TO PRINT error...FIX THIS")
         plt.close('all')
 
         return loss
