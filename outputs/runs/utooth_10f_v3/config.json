@@ -1,0 +1,17 @@
+{
+  "data_path": "/home/gaetano/utooth/DATA/",
+  "max_epochs": 65,
+  "batch_size": 5,
+  "n_folds": 10,
+  "random_seed": 2025,
+  "use_wandb": false,
+  "test_run": false,
+  "no_early_stopping": true,
+  "experiment_name": "utooth_10f_v3",
+  "resume": false,
+  "auto_resume": false,
+  "force_restart": true,
+  "no_resume": false,
+  "start_time": "2025-07-23T13:13:39.063480",
+  "resume_count": 0
+}

@@ -1,0 +1,17 @@
+activation: relu
+attention: false
+batch_norm: unset
+conv_mode: same
+dim: 3
+full_norm: true
+in_channels: 1
+learning_rate: 0.002
+loss_alpha: 0.5236
+loss_gamma: 1.0
+merge_mode: concat
+n_blocks: 4
+normalization: batch
+out_channels: 4
+planar_blocks: !!python/tuple []
+start_filters: 32
+up_mode: transpose

@@ -53,6 +53,7 @@ from ..utils import ct_utils
 from ..losses import loss
 from torch import sigmoid
 import wandb
+from .accuracy_metrics import calculate_multiclass_iou, calculate_dice_coefficient, calculate_binary_iou
 
 # TODO: Pre-calculate output sizes when using valid convolutions
 class UNet(pl.LightningModule):
@@ -452,8 +453,25 @@ class UNet(pl.LightningModule):
         loss = self.focal_tversky_loss(logits, y)
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-        accu = jaccard_index(sigmoid(logits), y.squeeze(1), task='multiclass', num_classes=4, threshold=0.5)
-        self.log('val_accu', accu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        # Calculate corrected IoU metric
+        pred_sigmoid = sigmoid(logits)
+        iou = calculate_multiclass_iou(pred_sigmoid, y, num_classes=4, threshold=0.5)
+        self.log('val_iou', iou, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        
+        # Also log Dice coefficient for comparison
+        dice = calculate_dice_coefficient(pred_sigmoid, y, num_classes=4, threshold=0.5)
+        self.log('val_dice', dice, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        
+        # Log binary IoU (any tooth vs background)
+        binary_iou = calculate_binary_iou(pred_sigmoid, y, threshold=0.5)
+        self.log('val_binary_iou', binary_iou, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        
+        # Keep the old metric for backward compatibility but rename it
+        accu_old = jaccard_index(sigmoid(logits), y.squeeze(1), task='multiclass', num_classes=4, threshold=0.5)
+        self.log('val_accu_old', accu_old, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        
+        # Use the corrected IoU as the main accuracy metric
+        self.log('val_accu', iou, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
         # Log a visualization
         # https://wandb.ai/stacey/deep-drive/reports/Image-Masks-for-Semantic-Segmentation--Vmlldzo4MTUwMw

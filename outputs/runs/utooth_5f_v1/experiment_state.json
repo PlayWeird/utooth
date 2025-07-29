@@ -1,0 +1,68 @@
+{
+  "experiment_name": "utooth_5f_v1",
+  "total_folds": 5,
+  "completed_folds": [
+    {
+      "fold_idx": 0,
+      "best_val_loss": 0.29306530952453613,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 38,
+      "val_samples": 10,
+      "training_time_seconds": 460.8370473384857,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_5f_v1/checkpoints/fold_0/utooth-epoch=42-val_loss=0.2931.ckpt"
+    },
+    {
+      "fold_idx": 1,
+      "best_val_loss": 0.15127471089363098,
+      "best_epoch": 0,
+      "final_epoch": 44,
+      "train_samples": 38,
+      "val_samples": 10,
+      "training_time_seconds": 735.8503563404083,
+      "early_stopped": true,
+      "best_model_path": "outputs/runs/utooth_5f_v1/checkpoints/fold_1/utooth-epoch=33-val_loss=0.1513.ckpt"
+    },
+    {
+      "fold_idx": 2,
+      "best_val_loss": 0.17285744845867157,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 38,
+      "val_samples": 10,
+      "training_time_seconds": 876.6781797409058,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_5f_v1/checkpoints/fold_2/utooth-epoch=41-val_loss=0.1729.ckpt"
+    },
+    {
+      "fold_idx": 3,
+      "best_val_loss": 0.12223000079393387,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 39,
+      "val_samples": 9,
+      "training_time_seconds": 903.5357112884521,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_5f_v1/checkpoints/fold_3/utooth-epoch=45-val_loss=0.1222.ckpt"
+    },
+    {
+      "fold_idx": 4,
+      "best_val_loss": 0.1688743680715561,
+      "best_epoch": 0,
+      "final_epoch": 34,
+      "train_samples": 39,
+      "val_samples": 9,
+      "training_time_seconds": 649.5934183597565,
+      "early_stopped": true,
+      "best_model_path": "outputs/runs/utooth_5f_v1/checkpoints/fold_4/utooth-epoch=23-val_loss=0.1689.ckpt"
+    }
+  ],
+  "failed_folds": [],
+  "current_fold": null,
+  "start_time": "2025-07-22T16:11:11.817326",
+  "last_update": "2025-07-22T17:11:40.523672",
+  "status": "completed",
+  "resume_count": 0,
+  "completed_at": "2025-07-22T17:11:40.525251"
+}

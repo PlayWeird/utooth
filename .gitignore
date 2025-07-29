@@ -108,22 +108,35 @@ dmypy.json
 # Weights & Biases
 wandb/
 
-# Model checkpoints
-*.ckpt
-*.pth
-*.pt
-
 # PyTorch Lightning logs
 lightning_logs/
 
 # Script-generated outputs
-outputs/
+outputs/checkpoints/
+outputs/logs/
 !outputs/runs/
 !outputs/runs/*/
 !outputs/runs/*/results_summary.*
 !outputs/runs/*/training_report.md
+!outputs/runs/*/config.json
+!outputs/runs/*/visualizations/
 checkpoints/
 utooth/
+
+# Large model files and training artifacts
+*.ckpt
+*.pth
+*.pt
+outputs/runs/*/checkpoints/
+outputs/runs/*/wandb/
+outputs/runs/*/metrics/*/metrics.csv
+
+# Keep analysis results and documentation
+!analysis/
+!analysis/*.md
+!analysis/*.json
+!analysis/*.csv
+!analysis/*.png
 
 # IDE files
 .vscode/

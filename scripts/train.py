@@ -16,15 +16,40 @@ from datetime import datetime
 import pandas as pd
 import time
 
+# Fix matplotlib backend issue that causes "NO POLYGONS TO PRINT" warnings
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.data.volume_dataloader_kfold import CTScanDataModuleKFold
 from src.models.unet import UNet
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger, CSVLogger
 import src.utils.ct_utils as ct_utils
+
+
+class MetricsCallback(Callback):
+    """Custom callback to track best validation metrics"""
+    def __init__(self):
+        super().__init__()
+        self.best_val_loss = float('inf')
+        self.best_val_accu = 0.0
+        self.best_epoch = 0
+        
+    def on_validation_end(self, trainer, pl_module):
+        # Get current validation metrics
+        val_loss = trainer.callback_metrics.get('val_loss')
+        val_accu = trainer.callback_metrics.get('val_accu')
+        
+        if val_loss is not None and val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss.item()
+            self.best_epoch = trainer.current_epoch
+            
+        if val_accu is not None and val_accu > self.best_val_accu:
+            self.best_val_accu = val_accu.item()
 
 
 def create_fold_indices(data_path, n_folds=5, random_seed=42):
@@ -151,7 +176,10 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
         verbose=True
     )
     
-    callbacks = [lr_monitor, checkpoint]
+    # Add custom metrics callback
+    metrics_callback = MetricsCallback()
+    
+    callbacks = [lr_monitor, checkpoint, metrics_callback]
     if not args.no_early_stopping:
         callbacks.append(early_stopping)
     
@@ -200,6 +228,7 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
     fold_stats = {
         'fold_idx': fold_idx,
         'best_val_loss': checkpoint.best_model_score.item() if checkpoint.best_model_score else float('inf'),
+        'best_val_accu': metrics_callback.best_val_accu,
         'best_epoch': int(checkpoint.best_k_models[checkpoint.best_model_path]) if hasattr(checkpoint, 'best_k_models') and checkpoint.best_model_path in checkpoint.best_k_models else -1,
         'final_epoch': trainer.current_epoch,
         'train_samples': len(train_indices),
@@ -215,7 +244,7 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
     with open(fold_stats_path, 'w') as f:
         json.dump(fold_stats, f, indent=2)
     
-    return fold_stats
+    return fold_stats, metrics_callback
 
 
 def main():
@@ -361,7 +390,7 @@ def main():
             json.dump(experiment_state, f, indent=2)
         
         try:
-            fold_stats = train_fold(fold_idx, train_indices, val_indices, args.data_path, args, run_dir)
+            fold_stats, metrics_callback = train_fold(fold_idx, train_indices, val_indices, args.data_path, args, run_dir)
             fold_results.append(fold_stats)
             
             # Update experiment state with completed fold
@@ -372,6 +401,7 @@ def main():
             
             print(f"\nFold {fold_idx + 1} completed:")
             print(f"  Best validation loss: {fold_stats['best_val_loss']:.4f}")
+            print(f"  Best validation accuracy: {fold_stats['best_val_accu']:.4f}")
             print(f"  Training time: {fold_stats['training_time_seconds']/60:.1f} minutes")
             print(f"  Early stopped: {fold_stats['early_stopped']}")
             
@@ -389,6 +419,7 @@ def main():
     # Calculate overall statistics
     total_time = time.time() - overall_start_time
     val_losses = [f['best_val_loss'] for f in fold_results]
+    val_accus = [f['best_val_accu'] for f in fold_results]
     
     # Print summary
     print(f"\n{'='*70}")
@@ -396,10 +427,12 @@ def main():
     print(f"{'='*70}")
     for i, stats in enumerate(fold_results):
         print(f"Fold {i + 1}: Val Loss = {stats['best_val_loss']:.4f} | "
+              f"Val Accu = {stats['best_val_accu']:.4f} | "
               f"Best Epoch = {stats['best_epoch']} | "
               f"Time = {stats['training_time_seconds']/60:.1f} min")
     print(f"{'='*70}")
     print(f"Average validation loss: {np.mean(val_losses):.4f} ± {np.std(val_losses):.4f}")
+    print(f"Average validation accuracy: {np.mean(val_accus):.4f} ± {np.std(val_accus):.4f}")
     print(f"Total training time: {total_time/3600:.2f} hours")
     print(f"{'='*70}")
     
@@ -421,6 +454,10 @@ def main():
             'std_val_loss': float(np.std(val_losses)),
             'min_val_loss': float(np.min(val_losses)),
             'max_val_loss': float(np.max(val_losses)),
+            'mean_val_accu': float(np.mean(val_accus)),
+            'std_val_accu': float(np.std(val_accus)),
+            'min_val_accu': float(np.min(val_accus)),
+            'max_val_accu': float(np.max(val_accus)),
             'total_training_time_hours': total_time/3600,
             'completed_at': datetime.now().isoformat(),
             'resume_count': experiment_state['resume_count']
@@ -460,12 +497,15 @@ def main():
         f.write(f"| Mean Validation Loss | {np.mean(val_losses):.4f} ± {np.std(val_losses):.4f} |\n")
         f.write(f"| Min Validation Loss | {np.min(val_losses):.4f} |\n")
         f.write(f"| Max Validation Loss | {np.max(val_losses):.4f} |\n")
+        f.write(f"| Mean Validation Accuracy | {np.mean(val_accus):.4f} ± {np.std(val_accus):.4f} |\n")
+        f.write(f"| Min Validation Accuracy | {np.min(val_accus):.4f} |\n")
+        f.write(f"| Max Validation Accuracy | {np.max(val_accus):.4f} |\n")
         f.write(f"| Total Training Time | {total_time/3600:.2f} hours |\n\n")
         f.write(f"## Fold Details\n\n")
-        f.write(f"| Fold | Val Loss | Best Epoch | Training Time | Early Stopped |\n")
-        f.write(f"| --- | --- | --- | --- | --- |\n")
+        f.write(f"| Fold | Val Loss | Val Accuracy | Best Epoch | Training Time | Early Stopped |\n")
+        f.write(f"| --- | --- | --- | --- | --- | --- |\n")
         for i, stats in enumerate(fold_results):
-            f.write(f"| {i+1} | {stats['best_val_loss']:.4f} | {stats['best_epoch']} | "
+            f.write(f"| {i+1} | {stats['best_val_loss']:.4f} | {stats['best_val_accu']:.4f} | {stats['best_epoch']} | "
                    f"{stats['training_time_seconds']/60:.1f} min | "
                    f"{'Yes' if stats['early_stopped'] else 'No'} |\n")
         f.write(f"\n## Model Checkpoints\n\n")

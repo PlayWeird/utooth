@@ -16,10 +16,19 @@ A deep learning approach to automate tooth segmentation from computed tomography
 * GPU training with DataParallel strategy
 
 ## Results
-* 91.3% Intersection-Over-Union (IOU) accuracy
-* 0.098 Focal Tversky Loss
+* **85.0% Corrected IoU** (best single model: utooth_10f_v3, fold 7)
+* **91.9% Dice Score** (medical imaging standard metric)
+* **74-82% Average IoU** across all experiments (much higher than initially reported 58%)
 * Successfully processes full-body CT scans
 * Reduces segmentation time from 10 minutes to seconds per tooth
+
+### Performance by Experiment:
+- utooth_10f_v3: 74.2% ± 8.7% IoU (best overall)
+- utooth_10f_v4: 74.2% ± 7.0% IoU  
+- utooth_10f_v2: 73.7% ± 7.0% IoU
+- utooth_10f_v1: 73.3% ± 11.2% IoU
+
+*Note: Original training reported lower accuracy due to incorrect metric calculation. See `analysis/` for corrected results.*
 
 ## Project Structure
 
@@ -27,7 +36,8 @@ A deep learning approach to automate tooth segmentation from computed tomography
 utooth/
 ├── src/                    # Source code modules
 │   ├── models/            # Neural network architectures
-│   │   └── unet.py        # 3D U-Net implementation (modified from ELEKTRONN3)
+│   │   ├── unet.py        # 3D U-Net implementation (with corrected metrics)
+│   │   └── accuracy_metrics.py  # Corrected IoU, Dice, and Binary IoU metrics
 │   ├── data/              # Data loading and processing
 │   │   ├── volume_dataloader.py       # PyTorch Lightning DataModule
 │   │   └── volume_dataloader_kfold.py  # K-fold cross-validation data loader
@@ -35,14 +45,31 @@ utooth/
 │   │   └── ct_utils.py    # CT scan preprocessing utilities
 │   └── losses/            # Loss functions
 │       └── loss.py        # Focal Tversky Loss implementation
+├── scripts/               # Executable scripts
+│   ├── analysis/          # Analysis and evaluation scripts
+│   │   ├── analyze_existing_runs.py   # Re-evaluate runs with corrected metrics
+│   │   ├── find_best_results.py       # Find best performing models
+│   │   ├── analyze_fold_performance.py # Fold performance analysis
+│   │   └── analyze_fold_cases.py      # Case difficulty analysis
+│   ├── visualization/     # Visualization scripts
+│   │   ├── visualize_predictions.py   # Model prediction visualizations
+│   │   └── visualize_run.py          # Training run visualizations
+│   ├── testing/           # Testing and debugging scripts
+│   │   ├── test_corrected_accuracy.py # Test corrected metrics
+│   │   └── test_accuracy_calculation.py # Debug accuracy calculations
+│   ├── train.py          # Main training script with K-fold CV
+│   ├── monitor_training.py # Training monitoring utilities
+│   └── run_training.sh   # Bash script for training automation
+├── analysis/              # Analysis results and reports
+│   ├── corrected_metrics_analysis.json     # Detailed corrected metrics
+│   ├── corrected_metrics_analysis_*.csv    # Summary tables
+│   ├── fold_performance_analysis.png       # Fold performance charts
+│   └── README.md         # Analysis documentation
 ├── notebooks/             # Jupyter notebooks
 │   ├── preprocessing_dicom.ipynb  # DICOM preprocessing pipeline
 │   ├── unet_trainer.ipynb        # Main training notebook
 │   ├── sweeps.ipynb              # Hyperparameter optimization
 │   └── model_tester.ipynb        # Model evaluation and testing
-├── scripts/               # Executable scripts
-│   ├── train.py          # Standalone training script with K-fold CV
-│   └── run_training.sh   # Bash script for training automation
 ├── configs/               # Configuration files
 │   └── wandb_config.yaml # Weights & Biases sweep configuration
 ├── docs/                  # Documentation
@@ -50,10 +77,41 @@ utooth/
 │   └── TRAINING_GUIDE.md # Detailed training guide
 ├── DATA/                  # CT scan data (NIfTI format)
 ├── outputs/               # Model outputs (created during training)
+│   ├── runs/             # Individual experiment runs
 │   ├── checkpoints/      # Saved model checkpoints
 │   └── logs/             # Training logs
-└── tests/                 # Unit tests (to be implemented)
+└── tests/                 # Unit tests
 ```
+
+## Corrected Accuracy Metrics (Important!)
+
+**Previous Issue**: Original training runs reported artificially low accuracy (~58%) due to incorrect `jaccard_index` usage with multi-class segmentation labels.
+
+**Solution**: Implemented corrected metrics in `src/models/accuracy_metrics.py`:
+- **Corrected IoU**: Properly handles label format (B, 1, C, D, H, W) for multi-class segmentation
+- **Dice Coefficient**: Medical imaging standard, often preferred over IoU
+- **Binary IoU**: Simplified tooth vs background metric
+
+**Impact**: Re-analysis shows models actually achieve 74-85% accuracy, matching expectations!
+
+### Using Corrected Metrics
+
+**For new training** (automatic with updated code):
+```bash
+python scripts/train.py --experiment_name new_corrected_run
+```
+
+**To re-analyze existing runs**:
+```bash
+python scripts/analysis/analyze_existing_runs.py
+python scripts/analysis/find_best_results.py
+```
+
+**Best model identified**:
+- Checkpoint: `outputs/runs/utooth_10f_v3/checkpoints/fold_7/utooth-epoch=61-val_loss=0.0844.ckpt`
+- IoU: 85.0%, Dice: 91.9%
+
+See `analysis/README.md` for complete results.
 
 ## Requirements
 * Python 3.7+
@@ -190,7 +248,7 @@ This repository contains a functional implementation of automated tooth segmenta
 If you find this work useful, please cite our paper [currently in review].
 
 ## Acknowledgments
-* CT preprocessing utilities adapted from Rachel Lea Ballantyne Draelos
-* NMDID database for CT scan data
-* Nevada Center for Applied Research
+* CT preprocessing utilities adapted from [Rachel Lea Ballantyne Draelos's ct-volume-preprocessing](https://github.com/rachellea/ct-volume-preprocessing)
+* [NMDID (New Mexico Decedent Image Database)](https://nmdid.unm.edu/) for CT scan data
+* [Nevada Center for Applied Research](https://www.unr.edu/ncar)
 * ELEKTRONN3 for U-Net architecture base

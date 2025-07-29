@@ -7,6 +7,8 @@ import numpy as np
 import pydicom
 import scipy.ndimage
 import imageio
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import nibabel as nib
 from scipy.spatial import distance_matrix
