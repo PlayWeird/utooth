@@ -1,6 +1,0 @@
-fold_idx,best_val_loss,best_epoch,final_epoch,train_samples,val_samples,training_time_seconds,early_stopped,best_model_path
-0,0.29306530952453613,0,50,38,10,460.8370473384857,False,outputs/runs/utooth_5f_v1/checkpoints/fold_0/utooth-epoch=42-val_loss=0.2931.ckpt
-1,0.15127471089363098,0,44,38,10,735.8503563404083,True,outputs/runs/utooth_5f_v1/checkpoints/fold_1/utooth-epoch=33-val_loss=0.1513.ckpt
-2,0.17285744845867157,0,50,38,10,876.6781797409058,False,outputs/runs/utooth_5f_v1/checkpoints/fold_2/utooth-epoch=41-val_loss=0.1729.ckpt
-3,0.12223000079393387,0,50,39,9,903.5357112884521,False,outputs/runs/utooth_5f_v1/checkpoints/fold_3/utooth-epoch=45-val_loss=0.1222.ckpt
-4,0.1688743680715561,0,34,39,9,649.5934183597565,True,outputs/runs/utooth_5f_v1/checkpoints/fold_4/utooth-epoch=23-val_loss=0.1689.ckpt
