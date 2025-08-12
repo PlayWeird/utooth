@@ -16,17 +16,18 @@ A deep learning approach to automate tooth segmentation from computed tomography
 * GPU training with DataParallel strategy
 
 ## Results
-* **85.0% Corrected IoU** (best single model: utooth_10f_v3, fold 7)
-* **91.9% Dice Score** (medical imaging standard metric)
-* **74-82% Average IoU** across all experiments
+* **84.3% IoU** (best single model: utooth_10f_v3, fold 4)
+* **90.2% Dice Score** (medical imaging standard metric)
+* **70-84% Average IoU** across all experiments
 * Successfully processes full-body CT scans
-* Reduces segmentation time from 10 minutes to seconds per tooth
+* Reduces segmentation time from 10 minutes to seconds per canine
 
-### Performance by Experiment:
-- utooth_10f_v3: 74.2% ± 8.7% IoU (best overall)
-- utooth_10f_v4: 74.2% ± 7.0% IoU  
-- utooth_10f_v2: 73.7% ± 7.0% IoU
-- utooth_10f_v1: 73.3% ± 11.2% IoU
+### Performance by Experiment (Corrected Metrics):
+- utooth_10f_v3: 84.26% ± 5.55% IoU (best overall)
+- utooth_10f_v2: 82.13% ± 5.77% IoU
+- utooth_10f_v4: 82.13% ± 6.34% IoU  
+- utooth_10f_v1: 73.31% ± 11.54% IoU
+- utooth_5f_v1: 70.51% ± 5.99% IoU
 
 ## Project Structure
 
@@ -170,15 +171,19 @@ jupyter notebook unet_trainer.ipynb
 - `scripts/run_training.sh` - Shell wrapper for training
 - `notebooks/unet_trainer.ipynb` - Original notebook implementation
 
+### Evaluation
+- `scripts/evaluate_trained_models.py` - Re-evaluate models with corrected metrics
+- `scripts/analyze_cross_validation_results.py` - Analyze training logs
+
 ### Visualization
 - `scripts/visualization/visualize_run.py` - Generate training metrics and performance charts
 - `scripts/visualization/visualize_predictions.py` - Visualize model predictions
 - `scripts/visualization/run_visualizations.sh` - Batch visualization generation
 
 ## Best Performing Model
-- **Model**: utooth_10f_v3, fold 7
-- **Checkpoint**: `outputs/runs/utooth_10f_v3/checkpoints/fold_7/utooth-epoch=61-val_loss=0.0844.ckpt`
-- **Performance**: 85.0% IoU, 91.9% Dice Score
+- **Model**: utooth_10f_v3, fold 4
+- **Checkpoint**: `outputs/runs/utooth_10f_v3/checkpoints/fold_4/utooth-epoch=43-val_loss=0.2227.ckpt`
+- **Performance**: 88.7% IoU, 94.0% Dice Score
 
 ## Citation
 If you find this work useful, please cite our paper [currently in review].
