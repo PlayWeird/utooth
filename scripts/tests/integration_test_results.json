@@ -1,0 +1,46 @@
+{
+  "test_config_system": {
+    "status": "PASS",
+    "result": {
+      "config_loaded": true,
+      "sweep_dir_created": true,
+      "required_dirs_exist": true,
+      "config_saved": true
+    }
+  },
+  "test_trial_executor_setup": {
+    "status": "PASS",
+    "result": {
+      "executor_created": true,
+      "fold_splits_created": true,
+      "fold_count": 3
+    }
+  },
+  "test_mock_trial_execution": {
+    "status": "FAIL",
+    "error": "'MockTrial' object has no attribute 'set_user_attr'"
+  },
+  "test_parallel_gpu_assignment": {
+    "status": "PASS",
+    "result": {
+      "available_gpus": [
+        0
+      ],
+      "retrieved_gpus": [],
+      "gpu_assignment_working": false
+    }
+  },
+  "test_monitoring_integration": {
+    "status": "FAIL",
+    "error": "'NoneType' object has no attribute 'trials'"
+  },
+  "test_mini_sweep_end_to_end": {
+    "status": "PASS",
+    "result": {
+      "sweep_runner_created": true,
+      "initialization_error": "'n_blocks'",
+      "error_expected": "mocked components"
+    }
+  },
+  "timestamp": 1755105301.2416077
+}

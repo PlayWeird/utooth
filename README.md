@@ -10,10 +10,11 @@ A deep learning approach to automate tooth segmentation from computed tomography
 * Custom Focal Tversky loss function for handling class imbalance
 * Visualization tools for CT volumes
 * PyTorch Lightning integration for training
-* Weights & Biases integration for experiment tracking
-* Hyperparameter optimization with W&B sweeps
-* K-fold cross-validation support
+* **Production Hyperparameter Sweep System** with Optuna optimization
+* Multi-GPU parallel execution (3x RTX 3090 support)
+* K-fold cross-validation support (5-fold default)
 * GPU training with DataParallel strategy
+* Comprehensive monitoring and visualization tools
 
 ## Results
 * **84.3% IoU** (best single model: utooth_10f_v3, fold 4)
@@ -47,6 +48,13 @@ utooth/
 ├── scripts/               # Executable scripts
 │   ├── train.py          # Main training script with K-fold CV
 │   ├── run_training.sh   # Bash script for training automation
+│   ├── sweep_runner.py   # Production hyperparameter sweep runner
+│   ├── monitor_sweep.py  # Real-time sweep monitoring
+│   ├── sweep/            # Hyperparameter sweep system
+│   │   ├── configs/      # Sweep configuration files
+│   │   ├── core/         # Core sweep functionality
+│   │   ├── monitoring/   # Monitoring and visualization
+│   │   └── utils/        # Sweep utilities
 │   └── visualization/     # Visualization scripts
 │       ├── visualize_predictions.py   # Model prediction visualizations
 │       ├── visualize_run.py          # Training run visualization
@@ -81,7 +89,7 @@ git clone https://github.com/PlayWeird/utooth.git
 cd utooth
 ```
 
-2. Create a virtual environment:
+2. Create and activate virtual environment:
 ```bash
 python -m venv utooth_env
 source utooth_env/bin/activate  # On Windows: utooth_env\Scripts\activate
@@ -92,21 +100,33 @@ source utooth_env/bin/activate  # On Windows: utooth_env\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Training
+### Hyperparameter Sweep (Recommended for New Datasets)
+
+**Production sweep** (90 trials, 3 GPUs, 5-fold CV):
+```bash
+python scripts/sweep_runner.py
+```
+
+**Monitor progress**:
+```bash
+python scripts/monitor_sweep.py --sweep_dir outputs/sweeps/latest --auto-detect
+```
+
+### Training with Optimized Parameters
 
 **Quick test run** (2 epochs, 2 folds):
 ```bash
 python scripts/train.py --test_run --experiment_name test_run
 ```
 
-**Full training** (80 epochs, 10 folds with optimal hyperparameters):
+**Full training** (30 epochs, 5 folds with optimal hyperparameters):
 ```bash
-python scripts/train.py --experiment_name production_v1 --use_wandb --max_epochs 80 --n_folds 10
+python scripts/train.py --experiment_name production_v1 --max_epochs 30 --n_folds 5
 ```
 
 **Using shell script**:
 ```bash
-./scripts/run_training.sh --wandb --experiment-name production_v1
+./scripts/run_training.sh --experiment-name production_v1
 ```
 
 ### Generate Visualizations
@@ -121,13 +141,12 @@ bash scripts/visualization/run_visualizations.sh
 ```
 
 ## Requirements
-* Python 3.7+
-* PyTorch
-* PyTorch Lightning
-* Pydicom
-* NumPy
-* Weights & Biases
-* Additional requirements in requirements.txt
+* Python 3.8+
+* PyTorch 2.0+
+* PyTorch Lightning 2.0+
+* NVIDIA RTX 3090 (or equivalent) for optimal performance
+* 24GB+ VRAM recommended for hyperparameter sweeps
+* All dependencies listed in requirements.txt
 
 ## Model Architecture & Hyperparameters
 
@@ -158,6 +177,67 @@ This allows the model to:
 1. Train quickly with high learning rate initially
 2. Fine-tune with lower rates when validation loss plateaus
 3. Achieve better convergence and final performance
+
+## Hyperparameter Optimization
+
+### Production Sweep System
+
+The project includes a comprehensive hyperparameter sweep system powered by Optuna:
+
+```bash
+# Launch production sweep (90 trials across 3 GPUs)
+python scripts/sweep_runner.py
+
+# Monitor real-time progress 
+python scripts/monitor_sweep.py --sweep_dir outputs/sweeps/latest --auto-detect
+```
+
+**Sweep Configuration:**
+- **90 total trials** (30 per GPU) across 3x RTX 3090s
+- **5-fold cross-validation** (450 total training runs)
+- **Tree-structured Parzen Estimator** (TPE) optimization
+- **Multi-GPU parallel execution** with queue management
+- **Early stopping** with median pruning (patience=10)
+
+**Resource Requirements:**
+- **Runtime:** ~11-12 hours for complete optimization
+- **VRAM:** ~12-16GB per GPU (within 24GB RTX 3090 capacity)
+- **Storage:** ~50-100GB for results and checkpoints
+
+**Search Space:**
+```yaml
+learning_rate: 1e-4 to 5e-3 (log scale)    # Learning dynamics
+loss_alpha: 0.3 to 0.7 (step 0.05)         # Tversky loss balance  
+loss_gamma: 0.75 to 2.0 (step 0.25)        # Focal loss focus
+batch_size: [4, 5, 6, 8]                   # Memory vs convergence
+start_filters: [16, 32, 64]                # Model capacity
+n_blocks: [3, 4, 5]                        # Network depth
+normalization: [batch, instance, group]    # Regularization type
+activation: [relu, leaky, silu]             # Non-linearity choice
+attention: [true, false]                   # Attention mechanism
+```
+
+**Expected Results:** 5-15% improvement over default parameters with high statistical confidence
+
+### Sweep Outputs
+
+Sweeps generate organized results in `outputs/sweeps/{experiment_name}/`:
+```
+├── results_summary.json        # Best hyperparameters & metrics
+├── plots/                     # Optimization visualizations
+│   ├── optimization_history.html
+│   ├── param_importances.html
+│   └── convergence_analysis.png
+├── reports/                   # Analysis reports
+└── trials/                    # Detailed trial data (90 files)
+```
+
+### Resume Capability
+
+Sweeps automatically resume from interruption points:
+- Loads existing Optuna study from database
+- Skips completed trials and continues optimization
+- Maintains all previous results and progress
 
 ## Advanced Usage
 

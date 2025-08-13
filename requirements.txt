@@ -1,23 +1,53 @@
-#requirements.txt - Pinned for 2021 compatibility
+# uTooth Project Requirements
+# Complete requirements for hyperparameter sweep system
+# Install with: pip install -r requirements.txt
 
-# Keep existing pins
-imageio==2.9.0
-matplotlib==3.1.1
-mpld3==0.3
-Pillow==6.1.0
-pydicom==1.3.0
-requests==2.22.0
-six~=1.16.0
-torch==2.0.1
-nibabel~=3.2.1
+# Core ML and PyTorch Stack
+torch>=2.0.1
+torchvision>=0.15.0  
+torchaudio>=2.0.0
+pytorch-lightning==2.0.9
+torchmetrics>=0.7.0
 
-# Pin compatible versions for 2021 stack
-numpy==1.21.6
-pandas==1.3.5
-scikit-image==0.18.3
-scikit-learn==1.0.2
-scipy==1.7.3
-seaborn==0.11.2
-wandb==0.12.21
-ipywidgets==7.6.5
-pytorch_lightning==2.0.9
+# Scientific Computing
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+scikit-learn>=1.0.0
+scikit-image>=0.18.0
+
+# Medical Imaging
+pydicom>=1.3.0
+nibabel>=3.2.0
+imageio>=2.9.0
+
+# Visualization
+matplotlib>=3.5.0
+seaborn>=0.11.0
+plotly>=5.0.0
+plotly-express>=0.4.1
+
+# Hyperparameter Optimization
+optuna>=3.4.0
+optuna-integration[pytorch_lightning]>=4.4.0
+
+# Configuration and Utils
+PyYAML>=6.0
+requests>=2.25.0
+six>=1.16.0
+
+# Jupyter and Development
+jupyter>=1.0.0
+notebook>=6.0.0
+jupyterlab>=3.0.0
+ipywidgets>=7.6.0
+
+# Image Processing
+Pillow>=8.0.0
+
+# Optional: Enhanced Visualization
+kaleido>=0.2.1  # For plotly static exports
+dash>=2.10.0    # For interactive dashboards
+
+# Optional: Alternative Optimization
+scikit-optimize>=0.9.0

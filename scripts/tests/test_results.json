@@ -1,0 +1,155 @@
+{
+  "test_gpu_detection": {
+    "status": "PASS",
+    "result": {
+      "cuda_available": true,
+      "gpu_count": 3,
+      "expected_gpus": 3,
+      "gpu_info": [
+        {
+          "device_id": 0,
+          "name": "NVIDIA GeForce RTX 3090",
+          "memory_total_gb": 23.68316650390625,
+          "memory_available_gb": 23.68316650390625
+        },
+        {
+          "device_id": 1,
+          "name": "NVIDIA GeForce RTX 3090",
+          "memory_total_gb": 23.69110107421875,
+          "memory_available_gb": 23.69110107421875
+        },
+        {
+          "device_id": 2,
+          "name": "NVIDIA GeForce RTX 3090",
+          "memory_total_gb": 23.69110107421875,
+          "memory_available_gb": 23.69110107421875
+        }
+      ]
+    }
+  },
+  "test_pytorch_cuda_setup": {
+    "status": "PASS",
+    "result": [
+      {
+        "gpu_id": 0,
+        "operation_successful": true,
+        "operation_time_seconds": 0.008449077606201172,
+        "memory_allocated_gb": 0.01953125,
+        "memory_reserved_gb": 0.01953125
+      },
+      {
+        "gpu_id": 1,
+        "operation_successful": true,
+        "operation_time_seconds": 0.0068264007568359375,
+        "memory_allocated_gb": 0.01953125,
+        "memory_reserved_gb": 0.01953125
+      },
+      {
+        "gpu_id": 2,
+        "operation_successful": true,
+        "operation_time_seconds": 0.006822824478149414,
+        "memory_allocated_gb": 0.01953125,
+        "memory_reserved_gb": 0.01953125
+      }
+    ]
+  },
+  "test_config_loading": {
+    "status": "PASS",
+    "result": {
+      "config_loaded": true,
+      "validation_passed": true,
+      "hyperparameter_count": 9,
+      "gpu_count_config": 3,
+      "max_epochs": 30
+    }
+  },
+  "test_directory_creation": {
+    "status": "PASS",
+    "result": {
+      "sweep_dir_created": true,
+      "expected_dirs": [
+        "trials",
+        "logs",
+        "plots",
+        "reports"
+      ],
+      "created_dirs": [
+        "trials",
+        "logs",
+        "plots",
+        "reports"
+      ],
+      "config_file_exists": true,
+      "sweep_dir_path": "/tmp/tmp2wi28hwp/utooth_default_sweep_20250813_101755"
+    }
+  },
+  "test_optuna_setup": {
+    "status": "PASS",
+    "result": {
+      "study_created": true,
+      "study_name": "utooth_default_sweep",
+      "direction": "MINIMIZE",
+      "sampler_type": "TPESampler",
+      "pruner_type": "MedianPruner"
+    }
+  },
+  "test_hyperparameter_suggestion": {
+    "status": "PASS",
+    "result": {
+      "suggestion_successful": true,
+      "suggested_params": {
+        "learning_rate": 0.00255,
+        "loss_alpha": 0.5,
+        "loss_gamma": 1.375,
+        "batch_size": 4,
+        "start_filters": 16,
+        "n_blocks": 3,
+        "normalization": "batch",
+        "activation": "relu",
+        "attention": true
+      },
+      "param_count": 9,
+      "expected_params": [
+        "learning_rate",
+        "loss_alpha",
+        "loss_gamma",
+        "batch_size",
+        "start_filters",
+        "n_blocks",
+        "normalization",
+        "activation",
+        "attention"
+      ]
+    }
+  },
+  "test_monitoring_setup": {
+    "status": "PASS",
+    "result": {
+      "monitor_created": true,
+      "plots_dir_exists": true,
+      "plots_dir_path": "/tmp/tmp0rau5ijy/plots"
+    }
+  },
+  "test_mock_sweep": {
+    "status": "PASS",
+    "result": {
+      "mock_sweep_completed": true,
+      "trials_completed": 3,
+      "best_value": 0.5684494720793793,
+      "best_params": {
+        "learning_rate": 0.00043284502212938834,
+        "loss_alpha": 0.7,
+        "loss_gamma": 1.75,
+        "batch_size": 4,
+        "start_filters": 16,
+        "n_blocks": 4,
+        "normalization": "batch",
+        "activation": "leaky",
+        "attention": false
+      }
+    }
+  },
+  "timestamp": "2025-08-13T10:17:55.558757",
+  "python_version": "3.10.14 | packaged by conda-forge | (main, Mar 20 2024, 12:45:18) [GCC 12.3.0]",
+  "pytorch_version": "2.7.1+cu118"
+}

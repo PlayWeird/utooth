@@ -1,0 +1,85 @@
+{
+  "Single GPU Test": {
+    "single_gpu_test": {
+      "gpu_id": 0,
+      "duration": 2.000690460205078,
+      "iterations": 165,
+      "avg_loss": 1.0366622350432657,
+      "iterations_per_second": 82.47152834581262,
+      "memory_allocated_gb": 0.13974761962890625,
+      "memory_reserved_gb": 0.201171875
+    }
+  },
+  "Multi-GPU Sequential Test": {
+    "sequential_gpu_test": [
+      {
+        "gpu_id": 0,
+        "duration": 2.001230239868164,
+        "iterations": 170,
+        "avg_loss": 1.020031830142526,
+        "iterations_per_second": 84.94774694749724,
+        "memory_allocated_gb": 0.13974761962890625,
+        "memory_reserved_gb": 0.216796875
+      },
+      {
+        "gpu_id": 1,
+        "duration": 2.0092430114746094,
+        "iterations": 167,
+        "avg_loss": 1.0215622986148218,
+        "iterations_per_second": 83.11587948609389,
+        "memory_allocated_gb": 0.13974761962890625,
+        "memory_reserved_gb": 0.201171875
+      },
+      {
+        "gpu_id": 2,
+        "duration": 2.0029501914978027,
+        "iterations": 166,
+        "avg_loss": 1.0262678951384074,
+        "iterations_per_second": 82.87774738715069,
+        "memory_allocated_gb": 0.13974761962890625,
+        "memory_reserved_gb": 0.201171875
+      }
+    ]
+  },
+  "Multi-GPU Parallel Test": {
+    "parallel_gpu_test": [
+      {
+        "gpu_id": 0,
+        "error": "Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
+      },
+      {
+        "gpu_id": 1,
+        "error": "Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
+      },
+      {
+        "gpu_id": 2,
+        "error": "Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method"
+      }
+    ]
+  },
+  "GPU Memory Stress Test": {
+    "memory_stress_test": [
+      {
+        "gpu_id": 0,
+        "tensors_allocated": 0,
+        "estimated_allocated_gb": 20,
+        "actual_memory_allocated_gb": 20.015869140625,
+        "memory_reserved_gb": 20.01953125
+      },
+      {
+        "gpu_id": 1,
+        "tensors_allocated": 0,
+        "estimated_allocated_gb": 20,
+        "actual_memory_allocated_gb": 20.015869140625,
+        "memory_reserved_gb": 20.01953125
+      },
+      {
+        "gpu_id": 2,
+        "tensors_allocated": 0,
+        "estimated_allocated_gb": 20,
+        "actual_memory_allocated_gb": 20.015869140625,
+        "memory_reserved_gb": 20.01953125
+      }
+    ]
+  }
+}

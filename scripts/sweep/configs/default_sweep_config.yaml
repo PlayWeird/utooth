@@ -1,0 +1,93 @@
+# Default Hyperparameter Sweep Configuration for uTooth
+# This file defines the search space and sweep parameters
+
+study:
+  name: "utooth_default_sweep"
+  direction: "minimize"  # minimize validation loss
+  storage: "sqlite"
+  pruner:
+    type: "median"
+    n_startup_trials: 5
+    n_warmup_steps: 10
+  sampler:
+    type: "tpe"
+    seed: 42
+
+# Hardware configuration
+hardware:
+  n_gpus: 3
+  memory_per_gpu: "24GB"  # RTX 3090
+
+# Training configuration for sweep
+training:
+  max_epochs: 30          # Reduced for faster sweep iterations
+  k_folds: 5              # 5-fold cross validation for better validation
+  early_stopping_patience: 10
+  trials_per_gpu: 30      # How many trials each GPU should run (90 total / 3 GPUs)
+
+# Hyperparameter search space
+hyperparameters:
+  # Learning rate - log scale
+  learning_rate:
+    type: "float"
+    low: 1e-4
+    high: 5e-3
+    log: true
+    
+  # Tversky loss parameters
+  loss_alpha:
+    type: "float"
+    low: 0.3
+    high: 0.7
+    step: 0.05
+    
+  loss_gamma:
+    type: "float"
+    low: 0.75
+    high: 2.0
+    step: 0.25
+    
+  # Architecture parameters
+  batch_size:
+    type: "categorical"
+    choices: [4, 5, 6, 8]
+    
+  start_filters:
+    type: "categorical"
+    choices: [16, 32, 64]
+    
+  n_blocks:
+    type: "categorical"
+    choices: [3, 4, 5]
+    
+  # Regularization and normalization
+  normalization:
+    type: "categorical"
+    choices: ["batch", "instance", "group"]
+    
+  activation:
+    type: "categorical"
+    choices: ["relu", "leaky", "silu"]
+    
+  attention:
+    type: "categorical"
+    choices: [true, false]
+
+# Best known configuration (will be tried first)
+baseline:
+  learning_rate: 2e-3
+  loss_alpha: 0.55
+  loss_gamma: 1.0
+  batch_size: 5
+  start_filters: 32
+  n_blocks: 4
+  normalization: "batch"
+  activation: "relu"
+  attention: false
+
+# Output configuration
+output:
+  base_directory: "outputs/sweeps"
+  save_checkpoints: false  # Don't save model checkpoints during sweep
+  generate_plots: true
+  create_report: true

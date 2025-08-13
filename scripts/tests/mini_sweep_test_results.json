@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-08-13T10:17:57.399844",
+  "test_passed": true,
+  "config_file": "/tmp/tmpk35e0nzr/test_config.yaml",
+  "data_directory": "/tmp/tmpk35e0nzr/mock_data",
+  "sweep_directory": "/tmp/tmpk35e0nzr/test_mini_sweep_101756_20250813_101756",
+  "gpu_count": 3,
+  "study_name": "test_mini_sweep_101756",
+  "components_tested": [
+    "configuration_loading",
+    "directory_creation",
+    "optuna_study_creation",
+    "hyperparameter_suggestion",
+    "monitoring_setup"
+  ]
+}

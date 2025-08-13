@@ -51,7 +51,12 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from ..utils import ct_utils
 from ..losses import loss
 from torch import sigmoid
-import wandb
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    wandb = None
 from .accuracy_metrics import calculate_multiclass_iou, calculate_dice_coefficient, calculate_binary_iou
 
 # TODO: Pre-calculate output sizes when using valid convolutions
@@ -477,12 +482,13 @@ class UNet(pl.LightningModule):
         logits = where(logits > 0.5, 1, 0).cpu().numpy()
         logits = logits.sum(axis=0)
         # Commenting out wandb image logging for now
-        # try:
-        #     jaw_image = ct_utils.plot_3d_with_labels(sample, logits, threshold=1200, transpose=[2, 1, 0], step_size=2, show=False)
-        #     log_image = wandb.Image(jaw_image, caption=f'Epoch: {self.current_epoch}')
-        #     wandb.log({'Validation Image': log_image})
-        # except Exception as e:
-        #     print("This is the NO POLYGONS TO PRINT error...FIX THIS")
+        # if WANDB_AVAILABLE:
+        #     try:
+        #         jaw_image = ct_utils.plot_3d_with_labels(sample, logits, threshold=1200, transpose=[2, 1, 0], step_size=2, show=False)
+        #         log_image = wandb.Image(jaw_image, caption=f'Epoch: {self.current_epoch}')
+        #         wandb.log({'Validation Image': log_image})
+        #     except Exception as e:
+        #         print("This is the NO POLYGONS TO PRINT error...FIX THIS")
         plt.close('all')
 
         return loss
