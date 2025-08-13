@@ -137,7 +137,7 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
         val_indices=val_indices
     )
     
-    # Initialize model with same hyperparameters as notebook
+    # Initialize model with optimal hyperparameters from cross-validation
     model = UNet(
         in_channels=1,
         out_channels=4,
@@ -148,9 +148,9 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
         conv_mode='same',
         dim=3,
         attention=False,
-        loss_alpha=0.5236,  # From notebook
-        loss_gamma=1.0,     # From notebook
-        learning_rate=2e-3  # From notebook
+        loss_alpha=0.55,    # Optimal from cross-validation
+        loss_gamma=1.0,     # Default
+        learning_rate=2e-3  # Original working value
     )
     
     # Setup callbacks
@@ -225,11 +225,20 @@ def train_fold(fold_idx, train_indices, val_indices, data_path, args, run_dir):
     fold_train_time = time.time() - fold_start_time
     
     # Collect fold statistics
+    # Extract best epoch from checkpoint filename
+    best_epoch = -1
+    if checkpoint.best_model_path:
+        import re
+        # Extract epoch number from filename like "utooth-epoch=43-val_loss=0.2227.ckpt"
+        epoch_match = re.search(r'epoch=(\d+)', checkpoint.best_model_path)
+        if epoch_match:
+            best_epoch = int(epoch_match.group(1))
+    
     fold_stats = {
         'fold_idx': fold_idx,
         'best_val_loss': checkpoint.best_model_score.item() if checkpoint.best_model_score else float('inf'),
         'best_val_accu': metrics_callback.best_val_accu,
-        'best_epoch': int(checkpoint.best_k_models[checkpoint.best_model_path]) if hasattr(checkpoint, 'best_k_models') and checkpoint.best_model_path in checkpoint.best_k_models else -1,
+        'best_epoch': best_epoch,
         'final_epoch': trainer.current_epoch,
         'train_samples': len(train_indices),
         'val_samples': len(val_indices),

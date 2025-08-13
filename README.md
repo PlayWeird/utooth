@@ -99,9 +99,9 @@ pip install -r requirements.txt
 python scripts/train.py --test_run --experiment_name test_run
 ```
 
-**Full training** (50 epochs, 5 folds):
+**Full training** (80 epochs, 10 folds with optimal hyperparameters):
 ```bash
-python scripts/train.py --experiment_name production_v1 --use_wandb --max_epochs 50 --n_folds 5
+python scripts/train.py --experiment_name production_v1 --use_wandb --max_epochs 80 --n_folds 10
 ```
 
 **Using shell script**:
@@ -128,6 +128,36 @@ bash scripts/visualization/run_visualizations.sh
 * NumPy
 * Weights & Biases
 * Additional requirements in requirements.txt
+
+## Model Architecture & Hyperparameters
+
+### Optimal Hyperparameters
+
+Based on extensive cross-validation, the following hyperparameters are now used by default:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Learning Rate | 2e-3 | Initial learning rate with Adam optimizer |
+| Loss Alpha | 0.55 | Alpha parameter for Focal Tversky Loss |
+| Loss Beta | 0.45 | Beta parameter (1 - alpha) |
+| Loss Gamma | 1.0 | Focal parameter |
+| Network Blocks | 4 | Number of encoder/decoder blocks |
+| Start Filters | 32 | Initial number of convolutional filters |
+| Batch Size | 5 | Samples per batch |
+
+### Learning Rate Schedule
+
+The model uses a ReduceLROnPlateau scheduler:
+- **Initial LR**: 2e-3
+- **Reduction Factor**: 0.5 (halves the learning rate)
+- **Patience**: 10 epochs (waits before reducing)
+- **Min LR**: 1e-6 (lower bound)
+- **Monitor**: Validation loss
+
+This allows the model to:
+1. Train quickly with high learning rate initially
+2. Fine-tune with lower rates when validation loss plateaus
+3. Achieve better convergence and final performance
 
 ## Advanced Usage
 

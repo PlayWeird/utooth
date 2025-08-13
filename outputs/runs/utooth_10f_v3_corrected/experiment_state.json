@@ -1,0 +1,133 @@
+{
+  "experiment_name": "utooth_10f_v3_corrected",
+  "total_folds": 10,
+  "completed_folds": [
+    {
+      "fold_idx": 0,
+      "best_val_loss": 0.1281512975692749,
+      "best_val_accu": 0.7755166888237,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 845.7285904884338,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_0/utooth-epoch=36-val_loss=0.1282.ckpt"
+    },
+    {
+      "fold_idx": 1,
+      "best_val_loss": 0.0962257981300354,
+      "best_val_accu": 0.8478813171386719,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 954.1697301864624,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_1/utooth-epoch=43-val_loss=0.0962.ckpt"
+    },
+    {
+      "fold_idx": 2,
+      "best_val_loss": 0.3843005895614624,
+      "best_val_accu": 0.5284685492515564,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 808.4694786071777,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_2/utooth-epoch=43-val_loss=0.3843.ckpt"
+    },
+    {
+      "fold_idx": 3,
+      "best_val_loss": 0.14318740367889404,
+      "best_val_accu": 0.7444713115692139,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 948.2821893692017,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_3/utooth-epoch=33-val_loss=0.1432.ckpt"
+    },
+    {
+      "fold_idx": 4,
+      "best_val_loss": 0.27192866802215576,
+      "best_val_accu": 0.556698203086853,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 1228.2394878864288,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_4/utooth-epoch=31-val_loss=0.2719.ckpt"
+    },
+    {
+      "fold_idx": 5,
+      "best_val_loss": 0.13573676347732544,
+      "best_val_accu": 0.7622184157371521,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 991.3508088588715,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_5/utooth-epoch=39-val_loss=0.1357.ckpt"
+    },
+    {
+      "fold_idx": 6,
+      "best_val_loss": 0.10037809610366821,
+      "best_val_accu": 0.8214017748832703,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 1007.134111404419,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_6/utooth-epoch=36-val_loss=0.1004.ckpt"
+    },
+    {
+      "fold_idx": 7,
+      "best_val_loss": 0.10464483499526978,
+      "best_val_accu": 0.8157157897949219,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 43,
+      "val_samples": 5,
+      "training_time_seconds": 980.0153181552887,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_7/utooth-epoch=38-val_loss=0.1046.ckpt"
+    },
+    {
+      "fold_idx": 8,
+      "best_val_loss": 0.14859145879745483,
+      "best_val_accu": 0.7838066816329956,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 44,
+      "val_samples": 4,
+      "training_time_seconds": 947.6730525493622,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_8/utooth-epoch=36-val_loss=0.1486.ckpt"
+    },
+    {
+      "fold_idx": 9,
+      "best_val_loss": 0.10589718818664551,
+      "best_val_accu": 0.8160011768341064,
+      "best_epoch": 0,
+      "final_epoch": 50,
+      "train_samples": 44,
+      "val_samples": 4,
+      "training_time_seconds": 952.2289047241211,
+      "early_stopped": false,
+      "best_model_path": "outputs/runs/utooth_10f_v3_corrected/checkpoints/fold_9/utooth-epoch=48-val_loss=0.1059.ckpt"
+    }
+  ],
+  "failed_folds": [],
+  "current_fold": null,
+  "start_time": "2025-08-12T12:05:50.907393",
+  "last_update": "2025-08-12T16:29:18.930602",
+  "status": "completed",
+  "resume_count": 4,
+  "completed_at": "2025-08-12T16:29:18.946549"
+}

@@ -3,15 +3,15 @@
   "max_epochs": 80,
   "batch_size": 5,
   "n_folds": 10,
-  "random_seed": 2026,
+  "random_seed": 2025,
   "use_wandb": true,
   "test_run": false,
   "no_early_stopping": true,
-  "experiment_name": "utooth_10f_v5",
+  "experiment_name": "utooth_10f_v6",
   "resume": true,
   "auto_resume": false,
   "force_restart": false,
   "no_resume": false,
-  "start_time": "2025-08-12T17:42:17.533571",
-  "resume_count": 0
+  "start_time": "2025-08-12T22:34:10.955310",
+  "resume_count": 1
 }

@@ -1,0 +1,12 @@
+{
+  "fold_idx": 3,
+  "best_val_loss": 0.12355595827102661,
+  "best_val_accu": 0.7857987284660339,
+  "best_epoch": 57,
+  "final_epoch": 80,
+  "train_samples": 43,
+  "val_samples": 5,
+  "training_time_seconds": 1643.268099308014,
+  "early_stopped": false,
+  "best_model_path": "outputs/runs/utooth_10f_v5/checkpoints/fold_3/utooth-epoch=57-val_loss=0.1236.ckpt"
+}

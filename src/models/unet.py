@@ -43,7 +43,6 @@ from numpy import where
 from torch import nn, sigmoid, where
 from torch.utils.checkpoint import checkpoint
 from torch.nn import functional as F
-from torchmetrics.functional import jaccard_index
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
@@ -466,9 +465,6 @@ class UNet(pl.LightningModule):
         binary_iou = calculate_binary_iou(pred_sigmoid, y, threshold=0.5)
         self.log('val_binary_iou', binary_iou, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         
-        # Keep the old metric for backward compatibility but rename it
-        accu_old = jaccard_index(sigmoid(logits), y.squeeze(1), task='multiclass', num_classes=4, threshold=0.5)
-        self.log('val_accu_old', accu_old, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         
         # Use the corrected IoU as the main accuracy metric
         self.log('val_accu', iou, on_step=False, on_epoch=True, prog_bar=False, logger=True)
@@ -493,7 +489,22 @@ class UNet(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        return optimizer
+        
+        # Add ReduceLROnPlateau scheduler
+        scheduler = {
+            'scheduler': torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode='min',
+                factor=0.5,      # Reduce LR by half
+                patience=10,     # Wait 10 epochs before reducing
+                min_lr=1e-6      # Don't go below this LR
+            ),
+            'monitor': 'val_loss',
+            'interval': 'epoch',
+            'frequency': 1
+        }
+        
+        return {'optimizer': optimizer, 'lr_scheduler': scheduler}
 
     @torch.jit.unused
     def forward_gradcp(self, x):

@@ -1,0 +1,11 @@
+fold_idx,best_val_loss,best_val_accu,best_epoch,final_epoch,train_samples,val_samples,training_time_seconds,early_stopped,best_model_path
+0,0.08480417728424072,0.8452790379524231,74,80,43,5,2313.6745398044586,False,outputs/runs/utooth_10f_v5/checkpoints/fold_0/utooth-epoch=74-val_loss=0.0848.ckpt
+1,0.2565351724624634,0.6087786555290222,60,80,43,5,1653.9675552845001,False,outputs/runs/utooth_10f_v5/checkpoints/fold_1/utooth-epoch=60-val_loss=0.2565.ckpt
+2,0.0987885594367981,0.8449201583862305,51,80,43,5,1646.0970056056976,False,outputs/runs/utooth_10f_v5/checkpoints/fold_2/utooth-epoch=51-val_loss=0.0988.ckpt
+3,0.12355595827102661,0.7857987284660339,57,80,43,5,1643.268099308014,False,outputs/runs/utooth_10f_v5/checkpoints/fold_3/utooth-epoch=57-val_loss=0.1236.ckpt
+4,0.09135246276855469,0.8343429565429688,69,80,43,5,1786.7194726467133,False,outputs/runs/utooth_10f_v5/checkpoints/fold_4/utooth-epoch=69-val_loss=0.0914.ckpt
+5,0.0846661925315857,0.8466804623603821,63,80,43,5,1846.4293146133423,False,outputs/runs/utooth_10f_v5/checkpoints/fold_5/utooth-epoch=63-val_loss=0.0847.ckpt
+6,0.14645296335220337,0.7203767895698547,62,80,43,5,1670.1018886566162,False,outputs/runs/utooth_10f_v5/checkpoints/fold_6/utooth-epoch=62-val_loss=0.1465.ckpt
+7,0.37922805547714233,0.5300885438919067,22,80,43,5,1605.394015789032,False,outputs/runs/utooth_10f_v5/checkpoints/fold_7/utooth-epoch=22-val_loss=0.3792.ckpt
+8,0.11178654432296753,0.8038548231124878,75,80,44,4,1648.4011669158936,False,outputs/runs/utooth_10f_v5/checkpoints/fold_8/utooth-epoch=75-val_loss=0.1118.ckpt
+9,0.22624003887176514,0.6068142652511597,72,80,44,4,1630.2483351230621,False,outputs/runs/utooth_10f_v5/checkpoints/fold_9/utooth-epoch=72-val_loss=0.2262.ckpt
