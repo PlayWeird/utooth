@@ -34,7 +34,7 @@ class SweepConfig:
     trials_per_gpu: int = 10
     
     # Paths
-    data_path: str = "/home/gaetano/utooth/DATA/"
+    data_path: str = "DATA"  # Relative to project root
     output_base: str = "outputs/sweeps"
     
     # Hyperparameters space

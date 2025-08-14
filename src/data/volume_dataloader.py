@@ -44,6 +44,9 @@ class CTScanDataModule(pl.LightningDataModule):
 
 class CTDataSet(Dataset):
     def __init__(self, data_dir: str):
+        # Handle both "DATA" and "DATA/" formats
+        if not data_dir.endswith('/'):
+            data_dir = data_dir + '/'
         self.data_path_list = glob.glob(data_dir + '*')
         self.data_path_list.sort()
 

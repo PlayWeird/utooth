@@ -1,0 +1,33 @@
+{
+  "total_trials": 90,
+  "completed_trials": 90,
+  "pruned_trials": 0,
+  "failed_trials": 0,
+  "success_rate": 1.0,
+  "best_trial_number": 68,
+  "best_value": 0.04873747229576111,
+  "best_params": {
+    "learning_rate": 0.0023378111371697686,
+    "loss_alpha": 0.55,
+    "loss_gamma": 2.0,
+    "batch_size": 6,
+    "start_filters": 32,
+    "n_blocks": 5,
+    "normalization": "instance",
+    "activation": "leaky",
+    "attention": false
+  },
+  "param_importance": {
+    "learning_rate": 0.651502075742576,
+    "loss_gamma": 0.20504221556747626,
+    "batch_size": 0.03481383910217159,
+    "loss_alpha": 0.034740461334339286,
+    "activation": 0.022991230321117204,
+    "normalization": 0.021025058864372483,
+    "start_filters": 0.018667532137703367,
+    "n_blocks": 0.0070507215398229765,
+    "attention": 0.004166865390420761
+  },
+  "total_time_hours": 9.586035443941752,
+  "trials_per_hour": 9.388657127997458
+}

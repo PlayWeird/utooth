@@ -117,8 +117,17 @@ def enqueue_baseline_trial(study: optuna.study.Study, baseline_params: Dict[str,
     """Enqueue the baseline parameters as the first trial."""
     
     if baseline_params:
-        study.enqueue_trial(baseline_params)
-        print(f"Enqueued baseline trial with parameters: {baseline_params}")
+        # Convert string values to proper types
+        converted_params = {}
+        for key, value in baseline_params.items():
+            if key == 'learning_rate' and isinstance(value, str):
+                # Convert scientific notation strings to floats
+                converted_params[key] = float(value)
+            else:
+                converted_params[key] = value
+        
+        study.enqueue_trial(converted_params)
+        print(f"Enqueued baseline trial with parameters: {converted_params}")
 
 
 def calculate_trial_metrics(fold_results: list) -> Dict[str, float]:

@@ -1,38 +1,24 @@
 #!/usr/bin/env python3
 """
-Organized Hyperparameter Sweep using Optuna for uTooth Model Optimization
-==========================================================================
+uTooth Hyperparameter Sweep Runner with Multi-GPU Support
+=========================================================
 
-This script provides a comprehensive hyperparameter sweep system with:
-- YAML configuration management
-- Parallel GPU execution
-- Organized directory structure  
-- Comprehensive reporting and monitoring
-
-Directory Structure:
-  outputs/sweeps/
-    └── {sweep_name}_{timestamp}/
-        ├── trials/           # Individual trial data
-        ├── checkpoints/      # Model checkpoints (if enabled)
-        ├── logs/            # Logging files
-        ├── plots/           # Visualization plots
-        ├── reports/         # Generated reports
-        └── sweep_config.yaml # Configuration used
-
-Usage:
-  python scripts/sweep_runner.py [options]
-  python scripts/sweep_runner.py --config sweep/configs/default_sweep_config.yaml --n_trials 50
+This script runs hyperparameter optimization using Optuna with parallel execution
+across multiple GPUs for efficient model training and evaluation.
 """
 
 import os
 import argparse
 import json
-import multiprocessing
 import sys
 from pathlib import Path
 from datetime import datetime
 import time
 import logging
+import torch
+import numpy as np
+import optuna
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,399 +35,365 @@ from src.data.volume_dataloader_kfold import CTScanDataModuleKFold
 from src.models.unet import UNet
 from scripts.train import MetricsCallback, create_fold_indices
 
-# Import ML frameworks
-import torch
-import numpy as np
-import optuna
-from optuna.integration import PyTorchLightningPruningCallback
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import CSVLogger
 
 
-class TrialExecutor:
-    """Handles execution of individual trials."""
+def run_single_trial(trial_params):
+    """Run a single trial on a specific GPU - this runs in a separate process"""
     
-    def __init__(self, config, sweep_dir, logger):
-        self.config = config
-        self.sweep_dir = sweep_dir
-        self.logger = logger
-        self.fold_splits = None
-        
-    def initialize(self):
-        """Initialize fold splits and other trial-independent setup."""
-        self.fold_splits = create_fold_indices(
-            self.config.data_path, 
-            self.config.k_folds, 
-            self.config.seed
-        )
-        self.logger.info(f"Created {len(self.fold_splits)} fold splits")
-        
-    def execute_trial(self, trial, gpu_id):
-        """Execute a single trial on specified GPU."""
-        
-        # Set GPU for this trial
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-        
-        # Suggest hyperparameters
-        suggested_params = suggest_hyperparameters(trial, self.config.hyperparameters)
-        
-        self.logger.info(f"Trial {trial.number} starting on GPU {gpu_id}")
-        self.logger.info(f"Parameters: {suggested_params}")
-        
-        # Train on each fold
-        fold_results = []
-        
-        for fold_idx, (train_indices, val_indices) in enumerate(self.fold_splits):
-            self.logger.info(f"Trial {trial.number} - Fold {fold_idx + 1}/{len(self.fold_splits)}")
-            
-            try:
-                fold_result = self._train_fold(
-                    trial, suggested_params, fold_idx, 
-                    train_indices, val_indices, gpu_id
-                )
-                fold_results.append(fold_result)
-                
-                # Report intermediate result for pruning
-                trial.report(fold_result['val_loss'], fold_idx)
-                if trial.should_prune():
-                    raise optuna.TrialPruned()
-                    
-            except Exception as e:
-                self.logger.error(f"Trial {trial.number} fold {fold_idx} failed: {str(e)}")
-                raise e
-        
-        # Calculate aggregated metrics
-        metrics = calculate_trial_metrics(fold_results)
-        
-        # Log results
-        log_trial_results(trial, metrics, suggested_params)
-        
-        # Save trial details
-        self._save_trial_details(trial, suggested_params, metrics, fold_results)
-        
-        return metrics['mean_val_loss']
+    trial_number, gpu_id, config, sweep_dir, fold_splits, hyperparams = trial_params
     
-    def _train_fold(self, trial, params, fold_idx, train_indices, val_indices, gpu_id):
-        """Train a single fold with given parameters."""
+    # Set this process to use only the assigned GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    
+    # Recreate logger for this process
+    logger = logging.getLogger(f"trial_{trial_number}_gpu_{gpu_id}")
+    logger.setLevel(logging.INFO)
+    
+    # Add file handler
+    log_file = sweep_dir / "logs" / f"trial_{trial_number}_gpu_{gpu_id}.log"
+    log_file.parent.mkdir(exist_ok=True)
+    fh = logging.FileHandler(log_file)
+    fh.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+    
+    logger.info(f"Trial {trial_number} starting on GPU {gpu_id}")
+    logger.info(f"Parameters: {hyperparams}")
+    
+    # Train on each fold
+    fold_results = []
+    
+    for fold_idx, (train_indices, val_indices) in enumerate(fold_splits):
+        logger.info(f"Trial {trial_number} - Fold {fold_idx + 1}/{len(fold_splits)}")
         
-        # Create data module
-        dataset = CTScanDataModuleKFold(
-            data_dir=self.config.data_path,
-            batch_size=params['batch_size'],
-            train_indices=train_indices,
-            val_indices=val_indices
-        )
-        
-        # Initialize model with suggested hyperparameters
-        model = UNet(
-            in_channels=1,
-            out_channels=4,
-            n_blocks=params['n_blocks'],
-            start_filters=params['start_filters'],
-            activation=params['activation'],
-            normalization=params['normalization'],
-            attention=params['attention'],
-            conv_mode='same',
-            dim=3,
-            loss_alpha=params['loss_alpha'],
-            loss_gamma=params['loss_gamma'],
-            learning_rate=params['learning_rate']
-        )
-        
-        # Setup callbacks
-        trial_dir = self.sweep_dir / "trials" / f"trial_{trial.number}"
-        trial_dir.mkdir(parents=True, exist_ok=True)
-        
-        callbacks = []
-        
-        # Model checkpoint (only if configured)
-        if self.config.save_checkpoints:
-            checkpoint_dir = self.sweep_dir / "checkpoints" / f"trial_{trial.number}" / f"fold_{fold_idx}"
-            checkpoint_dir.mkdir(parents=True, exist_ok=True)
-            
-            checkpoint = ModelCheckpoint(
-                monitor='val_loss',
-                dirpath=checkpoint_dir,
-                filename='best',
-                save_top_k=1,
-                mode='min'
+        try:
+            # Create data module
+            dataset = CTScanDataModuleKFold(
+                data_dir=config.data_path,
+                batch_size=hyperparams['batch_size'],
+                train_indices=train_indices,
+                val_indices=val_indices
             )
-            callbacks.append(checkpoint)
-        
-        # Early stopping
-        early_stopping = EarlyStopping(
-            monitor='val_loss',
-            patience=self.config.early_stopping_patience,
-            mode='min',
-            verbose=False
-        )
-        callbacks.append(early_stopping)
-        
-        # Optuna pruning callback
-        pruning_callback = PyTorchLightningPruningCallback(trial, monitor='val_loss')
-        callbacks.append(pruning_callback)
-        
-        # Metrics callback
-        metrics_callback = MetricsCallback()
-        callbacks.append(metrics_callback)
-        
-        # Setup logger
-        csv_logger = CSVLogger(
-            save_dir=trial_dir,
-            name=f'fold_{fold_idx}',
-            version=None
-        )
-        
-        # Initialize trainer
-        trainer = Trainer(
-            accelerator='gpu',
-            devices=1,
-            max_epochs=self.config.max_epochs,
-            callbacks=callbacks,
-            logger=csv_logger,
-            enable_progress_bar=False,
-            log_every_n_steps=1,
-            enable_model_summary=False
-        )
-        
-        # Train the model
-        trainer.fit(model, dataset)
-        
-        # Extract results
-        if self.config.save_checkpoints and 'checkpoint' in locals():
-            best_val_loss = checkpoint.best_model_score.item()
-        else:
-            # Get from trainer callback metrics if no checkpoint
-            best_val_loss = float('inf')
-            for callback in trainer.callbacks:
-                if hasattr(callback, 'best_model_score') and callback.best_model_score is not None:
-                    best_val_loss = callback.best_model_score.item()
-                    break
-        
-        return {
-            'fold_idx': fold_idx,
-            'val_loss': best_val_loss,
-            'val_accu': metrics_callback.best_val_accu,
-            'final_epoch': trainer.current_epoch,
-            'train_samples': len(train_indices),
-            'val_samples': len(val_indices)
-        }
-    
-    def _save_trial_details(self, trial, params, metrics, fold_results):
-        """Save detailed trial information."""
-        
-        trial_details = {
-            'trial_number': trial.number,
-            'trial_state': trial.state.name,
-            'parameters': params,
-            'metrics': metrics,
-            'fold_results': fold_results,
-            'timestamp': datetime.now().isoformat(),
-            'duration_seconds': (datetime.now() - trial.datetime_start).total_seconds() if trial.datetime_start else None
-        }
-        
-        trial_file = self.sweep_dir / "trials" / f"trial_{trial.number}.json"
-        with open(trial_file, 'w') as f:
-            json.dump(trial_details, f, indent=2)
-
-
-class SweepRunner:
-    """Main class for running hyperparameter sweeps."""
-    
-    def __init__(self, config_path=None):
-        # Load configuration
-        self.config = load_sweep_config(config_path)
-        
-        # Validate configuration
-        if not validate_config(self.config):
-            raise ValueError("Invalid configuration")
-        
-        # Create sweep directory
-        self.sweep_dir = create_sweep_directory(self.config)
-        
-        # Setup logging
-        self.logger = setup_logging(self.sweep_dir, verbose=True)
-        self.logger.info(f"Sweep directory created: {self.sweep_dir}")
-        
-        # Initialize trial executor
-        self.trial_executor = TrialExecutor(self.config, self.sweep_dir, self.logger)
-        self.trial_executor.initialize()
-        
-        # GPU management
-        self.available_gpus = list(range(min(self.config.n_gpus, torch.cuda.device_count())))
-        self.gpu_queue = multiprocessing.Queue()
-        for gpu_id in self.available_gpus:
-            self.gpu_queue.put(gpu_id)
-        
-        self.logger.info(f"Using GPUs: {self.available_gpus}")
-    
-    def run_sweep(self, n_trials=None):
-        """Run the hyperparameter sweep."""
-        
-        if n_trials is None:
-            n_trials = self.config.trials_per_gpu * len(self.available_gpus)
-        
-        self.logger.info(f"Starting sweep with {n_trials} trials on {len(self.available_gpus)} GPUs")
-        
-        # Create Optuna study
-        study = create_optuna_study(self.config, self.sweep_dir)
-        
-        # Enqueue baseline trial
-        enqueue_baseline_trial(study, self.config.baseline)
-        
-        # Define objective function for multiprocessing
-        def objective_wrapper(trial):
-            # Get available GPU
-            gpu_id = self.gpu_queue.get()
-            try:
-                result = self.trial_executor.execute_trial(trial, gpu_id)
-                return result
-            except optuna.TrialPruned:
-                raise
-            except Exception as e:
-                self.logger.error(f"Trial {trial.number} failed: {str(e)}")
-                raise e
-            finally:
-                # Return GPU to queue
-                self.gpu_queue.put(gpu_id)
-        
-        # Run optimization
-        start_time = time.time()
-        study.optimize(
-            objective_wrapper,
-            n_trials=n_trials,
-            n_jobs=len(self.available_gpus),
-            show_progress_bar=True
-        )
-        total_time = time.time() - start_time
-        
-        # Generate final report
-        self._generate_final_report(study, total_time)
-        
-        return study
-    
-    def _generate_final_report(self, study, total_time):
-        """Generate comprehensive final report."""
-        
-        self.logger.info("Generating final report...")
-        
-        # Get study statistics
-        stats = get_study_statistics(study)
-        
-        # Save statistics
-        stats_file = self.sweep_dir / "reports" / "sweep_statistics.json"
-        stats_file.parent.mkdir(exist_ok=True)
-        
-        stats['total_time_hours'] = total_time / 3600
-        stats['trials_per_hour'] = len(study.trials) / (total_time / 3600) if total_time > 0 else 0
-        
-        with open(stats_file, 'w') as f:
-            json.dump(stats, f, indent=2)
-        
-        # Generate markdown report
-        self._create_markdown_report(study, stats, total_time)
-        
-        # Print summary
-        print(f"\n{'='*70}")
-        print("HYPERPARAMETER SWEEP COMPLETED")
-        print(f"{'='*70}")
-        print(f"Total trials: {stats['total_trials']}")
-        print(f"Completed trials: {stats['completed_trials']}")
-        print(f"Success rate: {stats['success_rate']:.1%}")
-        print(f"Total time: {total_time/3600:.2f} hours")
-        if stats['best_value'] is not None:
-            print(f"Best validation loss: {stats['best_value']:.4f}")
-            print(f"Best trial: {stats['best_trial_number']}")
-        print(f"Results saved to: {self.sweep_dir}")
-        print(f"{'='*70}")
-    
-    def _create_markdown_report(self, study, stats, total_time):
-        """Create detailed markdown report."""
-        
-        report_file = self.sweep_dir / "reports" / "sweep_report.md"
-        
-        with open(report_file, 'w') as f:
-            f.write("# uTooth Hyperparameter Sweep Report\n\n")
-            f.write(f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"**Sweep Directory**: `{self.sweep_dir}`\n")
-            f.write(f"**Configuration**: `{self.sweep_dir / 'sweep_config.yaml'}`\n\n")
             
-            # Summary statistics
-            f.write("## Summary\n\n")
-            f.write(f"- **Total Trials**: {stats['total_trials']}\n")
-            f.write(f"- **Completed**: {stats['completed_trials']}\n")
-            f.write(f"- **Pruned**: {stats['pruned_trials']}\n")
-            f.write(f"- **Failed**: {stats['failed_trials']}\n")
-            f.write(f"- **Success Rate**: {stats['success_rate']:.1%}\n")
-            f.write(f"- **Total Time**: {total_time/3600:.2f} hours\n")
-            f.write(f"- **Trials per Hour**: {stats['trials_per_hour']:.1f}\n\n")
+            # Initialize model with suggested hyperparameters
+            model = UNet(
+                in_channels=1,
+                out_channels=4,
+                n_blocks=hyperparams['n_blocks'],
+                start_filters=hyperparams['start_filters'],
+                activation=hyperparams['activation'],
+                normalization=hyperparams['normalization'],
+                attention=hyperparams['attention'],
+                conv_mode='same',
+                dim=3,
+                loss_alpha=hyperparams['loss_alpha'],
+                loss_gamma=hyperparams['loss_gamma'],
+                learning_rate=hyperparams['learning_rate']
+            )
             
-            # Best trial
-            if stats['best_value'] is not None:
-                f.write("## Best Trial\n\n")
-                f.write(f"- **Trial Number**: {stats['best_trial_number']}\n")
-                f.write(f"- **Validation Loss**: {stats['best_value']:.4f}\n\n")
+            # Setup callbacks
+            trial_dir = sweep_dir / "trials" / f"trial_{trial_number}"
+            trial_dir.mkdir(parents=True, exist_ok=True)
+            
+            callbacks = []
+            
+            # Model checkpoint (only if configured)
+            if config.save_checkpoints:
+                checkpoint_dir = sweep_dir / "checkpoints" / f"trial_{trial_number}" / f"fold_{fold_idx}"
+                checkpoint_dir.mkdir(parents=True, exist_ok=True)
                 
-                f.write("### Best Hyperparameters\n\n")
-                f.write("| Parameter | Value |\n")
-                f.write("| --- | --- |\n")
-                for key, value in stats['best_params'].items():
-                    f.write(f"| {key} | {value} |\n")
-                f.write("\n")
+                checkpoint = ModelCheckpoint(
+                    monitor='val_loss',
+                    dirpath=checkpoint_dir,
+                    filename='best',
+                    save_top_k=1,
+                    mode='min'
+                )
+                callbacks.append(checkpoint)
             
-            # Parameter importance
-            if stats['param_importance']:
-                f.write("## Parameter Importance\n\n")
-                f.write("| Parameter | Importance |\n")
-                f.write("| --- | --- |\n")
-                for param, importance in sorted(stats['param_importance'].items(), 
-                                              key=lambda x: x[1], reverse=True):
-                    f.write(f"| {param} | {importance:.4f} |\n")
-                f.write("\n")
+            # Early stopping (only if patience is reasonable)
+            if config.early_stopping_patience < 10000:  # If patience is very high, skip early stopping
+                early_stopping = EarlyStopping(
+                    monitor='val_loss',
+                    patience=config.early_stopping_patience,
+                    mode='min',
+                    verbose=False
+                )
+                callbacks.append(early_stopping)
             
-            # Configuration used
-            f.write("## Configuration Used\n\n")
-            f.write("```yaml\n")
-            with open(self.sweep_dir / "sweep_config.yaml") as config_file:
-                f.write(config_file.read())
-            f.write("\n```\n")
+            # Metrics callback
+            metrics_callback = MetricsCallback()
+            callbacks.append(metrics_callback)
+            
+            # Setup logger
+            csv_logger = CSVLogger(
+                save_dir=trial_dir,
+                name=f'fold_{fold_idx}',
+                version=None
+            )
+            
+            # Initialize trainer - uses GPU 0 since we've set CUDA_VISIBLE_DEVICES
+            trainer = Trainer(
+                accelerator='gpu',
+                devices=1,
+                max_epochs=config.max_epochs,
+                callbacks=callbacks,
+                logger=csv_logger,
+                enable_progress_bar=False,
+                log_every_n_steps=1,
+                enable_model_summary=False
+            )
+            
+            # Train the model
+            trainer.fit(model, dataset)
+            
+            # Extract results
+            if config.save_checkpoints and 'checkpoint' in locals():
+                best_val_loss = checkpoint.best_model_score.item()
+            else:
+                best_val_loss = trainer.callback_metrics.get('val_loss', float('inf'))
+                if hasattr(best_val_loss, 'item'):
+                    best_val_loss = best_val_loss.item()
+            
+            fold_result = {
+                'fold_idx': fold_idx,
+                'val_loss': best_val_loss,
+                'val_accu': metrics_callback.best_val_accu,
+                'final_epoch': trainer.current_epoch,
+                'train_samples': len(train_indices),
+                'val_samples': len(val_indices)
+            }
+            fold_results.append(fold_result)
+            
+            # Aggressive memory cleanup after each fold
+            del model, trainer, dataset, callbacks, metrics_callback
+            if 'checkpoint' in locals():
+                del checkpoint
+            if 'early_stopping' in locals():
+                del early_stopping
+            if 'csv_logger' in locals():
+                del csv_logger
+                
+            import gc
+            gc.collect()
+            
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                torch.cuda.ipc_collect()  # Clear shared memory
+                
+        except Exception as e:
+            logger.error(f"Trial {trial_number} fold {fold_idx} failed: {str(e)}")
+            
+            # Aggressive cleanup even on failure
+            try:
+                if 'model' in locals():
+                    del model
+                if 'trainer' in locals():
+                    del trainer
+                if 'dataset' in locals():
+                    del dataset
+                if 'callbacks' in locals():
+                    del callbacks
+                if 'metrics_callback' in locals():
+                    del metrics_callback
+                if 'checkpoint' in locals():
+                    del checkpoint
+                if 'early_stopping' in locals():
+                    del early_stopping
+                if 'csv_logger' in locals():
+                    del csv_logger
+                    
+                import gc
+                gc.collect()
+                
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    torch.cuda.ipc_collect()
+            except:
+                pass  # Don't fail on cleanup
+                
+            raise e
+    
+    # Calculate aggregated metrics
+    metrics = calculate_trial_metrics(fold_results)
+    
+    # Save trial details
+    trial_details = {
+        'trial_number': trial_number,
+        'gpu_id': gpu_id,
+        'parameters': hyperparams,
+        'metrics': metrics,
+        'fold_results': fold_results,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    trial_file = sweep_dir / "trials" / f"trial_{trial_number}.json"
+    with open(trial_file, 'w') as f:
+        json.dump(trial_details, f, indent=2)
+    
+    logger.info(f"Trial {trial_number} completed with val_loss: {metrics['mean_val_loss']:.4f}")
+    
+    # Final aggressive cleanup after trial completion
+    import gc
+    gc.collect()
+    
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        torch.cuda.ipc_collect()
+        
+        # Force reset GPU memory stats
+        torch.cuda.reset_peak_memory_stats()
+        torch.cuda.reset_accumulated_memory_stats()
+    
+    logger.info(f"Trial {trial_number} GPU memory cleaned")
+    
+    return trial_number, metrics['mean_val_loss'], hyperparams, metrics
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='Run hyperparameter sweep for uTooth model',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
-    )
-    
+    parser = argparse.ArgumentParser(description='Parallel GPU Hyperparameter Sweep')
     parser.add_argument('--config', type=str, default=None,
-                        help='Path to YAML configuration file (default: use built-in config)')
+                        help='Path to YAML configuration file')
     parser.add_argument('--n_trials', type=int, default=None,
-                        help='Number of trials to run (default: trials_per_gpu * n_gpus from config)')
+                        help='Number of trials to run')
     parser.add_argument('--data_path', type=str, default=None,
                         help='Override data path from config')
     
     args = parser.parse_args()
     
-    try:
-        # Create sweep runner
-        runner = SweepRunner(config_path=args.config)
+    # Load configuration
+    config = load_sweep_config(args.config)
+    
+    # Validate configuration
+    if not validate_config(config):
+        raise ValueError("Invalid configuration")
+    
+    # Override data path if provided
+    if args.data_path:
+        config.data_path = args.data_path
+    
+    # Create sweep directory
+    sweep_dir = create_sweep_directory(config)
+    
+    # Setup logging
+    logger = setup_logging(sweep_dir, verbose=True)
+    logger.info(f"Sweep directory created: {sweep_dir}")
+    
+    # Create fold splits
+    fold_splits = create_fold_indices(config.data_path, config.k_folds, config.seed)
+    logger.info(f"Created {len(fold_splits)} fold splits")
+    
+    # Determine number of trials
+    if args.n_trials is None:
+        n_trials = config.trials_per_gpu * config.n_gpus
+    else:
+        n_trials = args.n_trials
+    
+    # Get available GPUs
+    n_gpus = min(config.n_gpus, torch.cuda.device_count())
+    available_gpus = list(range(n_gpus))
+    logger.info(f"Using {n_gpus} GPUs: {available_gpus}")
+    
+    # Create Optuna study
+    study = create_optuna_study(config, sweep_dir)
+    
+    # Enqueue baseline trial
+    if config.baseline:
+        enqueue_baseline_trial(study, config.baseline)
+    
+    logger.info(f"Starting sweep with {n_trials} trials on {n_gpus} GPUs")
+    
+    # Create trial parameters
+    trial_params_list = []
+    for i in range(n_trials):
+        trial = study.ask()
+        suggested_params = suggest_hyperparameters(trial, config.hyperparameters)
+        gpu_id = available_gpus[i % n_gpus]  # Round-robin GPU assignment
         
-        # Override data path if provided
-        if args.data_path:
-            runner.config.data_path = args.data_path
+        trial_params = (
+            trial.number,
+            gpu_id,
+            config,
+            sweep_dir,
+            fold_splits,
+            suggested_params
+        )
+        trial_params_list.append(trial_params)
         
-        # Run sweep
-        study = runner.run_sweep(n_trials=args.n_trials)
+        # Don't tell the study yet - we'll do it after completion
+    
+    # Run trials in parallel using ProcessPoolExecutor
+    start_time = time.time()
+    completed_trials = 0
+    
+    with ProcessPoolExecutor(max_workers=n_gpus) as executor:
+        # Submit all trials
+        future_to_trial = {
+            executor.submit(run_single_trial, params): params[0] 
+            for params in trial_params_list
+        }
         
-        return 0
-        
-    except Exception as e:
-        print(f"Sweep failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return 1
+        # Process completed trials
+        for future in as_completed(future_to_trial):
+            trial_number = future_to_trial[future]
+            try:
+                trial_num, val_loss, params, metrics = future.result()
+                
+                # Update the study with the result using trial number
+                study.tell(trial_num, val_loss)
+                
+                completed_trials += 1
+                logger.info(f"Progress: {completed_trials}/{n_trials} trials completed")
+                
+                # Log to console
+                print(f"Trial {trial_num} completed:")
+                print(f"  Mean validation loss: {metrics['mean_val_loss']:.4f} ± {metrics['std_val_loss']:.4f}")
+                print(f"  Mean validation accuracy: {metrics['mean_val_accu']:.4f} ± {metrics['std_val_accu']:.4f}")
+                
+            except Exception as e:
+                logger.error(f"Trial {trial_number} failed: {str(e)}")
+                # Mark trial as failed in study using trial number
+                study.tell(trial_number, float('inf'))
+    
+    total_time = time.time() - start_time
+    
+    # Generate final report
+    logger.info("Generating final report...")
+    stats = get_study_statistics(study)
+    
+    # Save statistics
+    stats_file = sweep_dir / "reports" / "sweep_statistics.json"
+    stats_file.parent.mkdir(exist_ok=True)
+    
+    stats['total_time_hours'] = total_time / 3600
+    stats['trials_per_hour'] = len(study.trials) / (total_time / 3600) if total_time > 0 else 0
+    
+    with open(stats_file, 'w') as f:
+        json.dump(stats, f, indent=2)
+    
+    # Print summary
+    print(f"\n{'='*70}")
+    print("HYPERPARAMETER SWEEP COMPLETED")
+    print(f"{'='*70}")
+    print(f"Total trials: {stats['total_trials']}")
+    print(f"Completed trials: {stats['completed_trials']}")
+    print(f"Success rate: {stats['success_rate']:.1%}")
+    print(f"Total time: {total_time/3600:.2f} hours")
+    if stats['best_value'] is not None:
+        print(f"Best validation loss: {stats['best_value']:.4f}")
+        print(f"Best trial: {stats['best_trial_number']}")
+        print(f"Best parameters: {stats['best_params']}")
+    print(f"Results saved to: {sweep_dir}")
+    print(f"{'='*70}")
+    
+    return 0
 
 
 if __name__ == "__main__":

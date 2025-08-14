@@ -1,0 +1,19 @@
+{
+  "n_seeds": 180,
+  "start_seed": 42,
+  "n_gpus": 3,
+  "n_folds": 10,
+  "data_path": "/home/user/utooth/DATA",
+  "hyperparameters": {
+    "learning_rate": 0.0023378111371697686,
+    "loss_alpha": 0.55,
+    "loss_gamma": 2.0,
+    "batch_size": 6,
+    "start_filters": 32,
+    "n_blocks": 5,
+    "normalization": "instance",
+    "activation": "leaky",
+    "attention": false
+  },
+  "timestamp": "20250814_101538"
+}

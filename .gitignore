@@ -123,6 +123,26 @@ outputs/logs/
 checkpoints/
 utooth/
 
+# Hyperparameter sweep outputs (keep only essential files)
+outputs/sweeps/*/logs/
+outputs/sweeps/*/trials/
+outputs/sweeps/*/checkpoints/
+!outputs/sweeps/*/reports/
+!outputs/sweeps/*/sweep_config.yaml
+!outputs/sweeps/*/optuna_study.db
+
+# Seed search outputs (keep only essential files)
+outputs/seed_search/*/logs/
+outputs/seed_search/*/seeds/*/fold_*/
+outputs/seed_search/*/seeds/*/checkpoints/
+!outputs/seed_search/*/reports/
+!outputs/seed_search/*/config.json
+!outputs/seed_search/*/seeds/*/results.json
+
+# Temporary files
+*.tmp
+*~
+
 # Large model files and training artifacts
 *.ckpt
 *.pth

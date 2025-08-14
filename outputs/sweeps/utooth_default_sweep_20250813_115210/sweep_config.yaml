@@ -1,0 +1,87 @@
+baseline:
+  activation: relu
+  attention: false
+  batch_size: 5
+  learning_rate: 2e-3
+  loss_alpha: 0.55
+  loss_gamma: 1.0
+  n_blocks: 4
+  normalization: batch
+  start_filters: 32
+hardware:
+  memory_per_gpu: 24GB
+  n_gpus: 3
+hyperparameters:
+  activation:
+    choices:
+    - relu
+    - leaky
+    - silu
+    type: categorical
+  attention:
+    choices:
+    - true
+    - false
+    type: categorical
+  batch_size:
+    choices:
+    - 4
+    - 5
+    - 6
+    - 8
+    type: categorical
+  learning_rate:
+    high: 5e-3
+    log: true
+    low: 1e-4
+    type: float
+  loss_alpha:
+    high: 0.7
+    low: 0.3
+    step: 0.05
+    type: float
+  loss_gamma:
+    high: 2.0
+    low: 0.75
+    step: 0.25
+    type: float
+  n_blocks:
+    choices:
+    - 3
+    - 4
+    - 5
+    type: categorical
+  normalization:
+    choices:
+    - batch
+    - instance
+    - group
+    type: categorical
+  start_filters:
+    choices:
+    - 16
+    - 32
+    - 64
+    type: categorical
+metadata:
+  created_at: '2025-08-13T11:52:10.696557'
+  sweep_directory: outputs/sweeps/utooth_default_sweep_20250813_115210
+output:
+  base_directory: outputs/sweeps
+  create_report: true
+  generate_plots: true
+  save_checkpoints: false
+study:
+  direction: minimize
+  name: utooth_default_sweep
+  pruner:
+    type: median
+  sampler:
+    seed: 42
+    type: tpe
+  storage: sqlite
+training:
+  early_stopping_patience: 999999
+  k_folds: 5
+  max_epochs: 70
+  trials_per_gpu: 30

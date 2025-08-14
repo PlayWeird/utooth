@@ -37,12 +37,14 @@ class MetricsCallback(Callback):
         super().__init__()
         self.best_val_loss = float('inf')
         self.best_val_accu = 0.0
+        self.best_val_dice = 0.0
         self.best_epoch = 0
         
     def on_validation_end(self, trainer, pl_module):
         # Get current validation metrics
         val_loss = trainer.callback_metrics.get('val_loss')
         val_accu = trainer.callback_metrics.get('val_accu')
+        val_dice = trainer.callback_metrics.get('val_dice')
         
         if val_loss is not None and val_loss < self.best_val_loss:
             self.best_val_loss = val_loss.item()
@@ -50,6 +52,10 @@ class MetricsCallback(Callback):
             
         if val_accu is not None and val_accu > self.best_val_accu:
             self.best_val_accu = val_accu.item()
+            
+        if val_dice is not None and val_dice > self.best_val_dice:
+            self.best_val_dice = val_dice.item()
+            self.best_epoch = trainer.current_epoch
 
 
 def create_fold_indices(data_path, n_folds=5, random_seed=42):

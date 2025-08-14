@@ -20,9 +20,9 @@ hardware:
 
 # Training configuration for sweep
 training:
-  max_epochs: 30          # Reduced for faster sweep iterations
+  max_epochs: 70          # Full training epochs for better convergence
   k_folds: 5              # 5-fold cross validation for better validation
-  early_stopping_patience: 10
+  early_stopping_patience: 999999  # Effectively disabled (very high value)
   trials_per_gpu: 30      # How many trials each GPU should run (90 total / 3 GPUs)
 
 # Hyperparameter search space
