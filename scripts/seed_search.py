@@ -34,13 +34,91 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import CSVLogger
 
 
+def manage_checkpoint_leaderboard(output_dir, seed_result, keep_best_n):
+    """Manage the leaderboard of best seeds and delete checkpoints for seeds not in top N"""
+    leaderboard_file = output_dir / "reports" / "checkpoint_leaderboard.json"
+    lock_file = output_dir / "reports" / "checkpoint_leaderboard.lock"
+    
+    # Simple file-based locking to prevent concurrent access
+    import time
+    max_wait = 30  # Maximum wait time in seconds
+    wait_time = 0
+    while lock_file.exists() and wait_time < max_wait:
+        time.sleep(0.1)
+        wait_time += 0.1
+    
+    # Create lock file
+    lock_file.touch()
+    
+    try:
+        # Load existing leaderboard or create new one
+        if leaderboard_file.exists():
+            with open(leaderboard_file, 'r') as f:
+                leaderboard = json.load(f)
+        else:
+            leaderboard = {"best_seeds": [], "max_seeds": keep_best_n}
+        
+        current_seed = seed_result["seed"]
+        current_dice = seed_result["mean_dice"]
+        
+        # Add current seed to leaderboard
+        leaderboard["best_seeds"].append({
+            "seed": current_seed,
+            "mean_dice": current_dice,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Sort by mean_dice descending
+        leaderboard["best_seeds"].sort(key=lambda x: x["mean_dice"], reverse=True)
+        
+        # Determine if we need to remove checkpoints
+        seeds_to_remove = []
+        if len(leaderboard["best_seeds"]) > keep_best_n:
+            # Keep only top N
+            seeds_to_keep = leaderboard["best_seeds"][:keep_best_n]
+            seeds_to_remove = leaderboard["best_seeds"][keep_best_n:]
+            leaderboard["best_seeds"] = seeds_to_keep
+            
+            # Delete checkpoints for seeds not in top N
+            for seed_info in seeds_to_remove:
+                seed_to_remove = seed_info["seed"]
+                seed_dir = output_dir / "seeds" / f"seed_{seed_to_remove}"
+                checkpoint_dir = seed_dir / "checkpoints"
+                
+                if checkpoint_dir.exists():
+                    import shutil
+                    shutil.rmtree(checkpoint_dir)
+                    print(f"Removed checkpoints for seed {seed_to_remove} (mean_dice: {seed_info['mean_dice']:.4f})")
+        
+        # Save updated leaderboard
+        with open(leaderboard_file, 'w') as f:
+            json.dump(leaderboard, f, indent=2)
+        
+        # Log current status
+        print(f"\nCheckpoint Leaderboard Status:")
+        print(f"Current seed {current_seed}: {current_dice:.4f}")
+        print(f"Top {min(len(leaderboard['best_seeds']), keep_best_n)} seeds with checkpoints:")
+        for i, seed_info in enumerate(leaderboard["best_seeds"][:keep_best_n], 1):
+            print(f"  {i}. Seed {seed_info['seed']}: {seed_info['mean_dice']:.4f}")
+        
+        return len(seeds_to_remove) > 0
+        
+    finally:
+        # Always remove lock file
+        if lock_file.exists():
+            lock_file.unlink()
+
+
 def run_single_seed(seed_params):
     """Run a single seed evaluation on a specific GPU - runs in separate process"""
     
-    seed, gpu_id, config, output_dir, fold_splits, best_hyperparams = seed_params
+    seed, gpu_id, config, output_dir, best_hyperparams = seed_params
     
     # Set this process to use only the assigned GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    
+    # Create fold indices unique to this seed
+    fold_splits = create_fold_indices(config['data_path'], config['n_folds'], random_seed=seed)
     
     # Setup logging for this seed
     log_file = output_dir / "logs" / f"seed_{seed}_gpu_{gpu_id}.log"
@@ -132,9 +210,9 @@ def run_single_seed(seed_params):
                 version=""
             )
             
-            # Trainer configuration (matching sweep settings)
+            # Trainer configuration with configurable max_epochs
             trainer = Trainer(
-                max_epochs=75,  # As requested
+                max_epochs=config['max_epochs'],
                 accelerator='gpu',
                 devices=[0],  # Use GPU 0 within this process
                 callbacks=callbacks,
@@ -223,6 +301,10 @@ def main():
                        help='Path to sweep results JSON with best hyperparameters')
     parser.add_argument('--output_base', type=str, default='outputs/seed_search',
                        help='Base directory for output')
+    parser.add_argument('--keep_best_n', type=int, default=10,
+                       help='Number of best seeds to keep checkpoints for (others will have checkpoints deleted)')
+    parser.add_argument('--max_epochs', type=int, default=90,
+                       help='Maximum number of training epochs')
     
     args = parser.parse_args()
     
@@ -283,8 +365,7 @@ def main():
     
     logger.info(f"Using hyperparameters: {json.dumps(best_hyperparams, indent=2)}")
     
-    # Create fold indices (same for all seeds for fair comparison)
-    fold_splits = create_fold_indices(args.data_path, args.n_folds, random_seed=42)
+    # Note: Each seed will create its own fold splits for proper cross-validation
     
     # Save configuration
     config = {
@@ -293,6 +374,7 @@ def main():
         'n_gpus': args.n_gpus,
         'n_folds': args.n_folds,
         'data_path': args.data_path,
+        'max_epochs': args.max_epochs,
         'hyperparameters': best_hyperparams,
         'timestamp': timestamp
     }
@@ -306,7 +388,7 @@ def main():
     
     for i, seed in enumerate(seeds):
         gpu_id = i % args.n_gpus  # Distribute seeds across GPUs
-        seed_params.append((seed, gpu_id, config, output_dir, fold_splits, best_hyperparams))
+        seed_params.append((seed, gpu_id, config, output_dir, best_hyperparams))
     
     # Run seeds in parallel
     all_results = []
@@ -327,6 +409,12 @@ def main():
                 if 'mean_dice' in result:
                     logger.info(f"[{completed}/{args.n_seeds}] Seed {seed} completed: "
                               f"Mean Dice = {result['mean_dice']:.4f} ± {result['std_dice']:.4f}")
+                    
+                    # Manage checkpoint leaderboard - keep only top N seeds
+                    try:
+                        manage_checkpoint_leaderboard(output_dir, result, args.keep_best_n)
+                    except Exception as e:
+                        logger.warning(f"Failed to manage checkpoints for seed {seed}: {str(e)}")
                 else:
                     logger.error(f"[{completed}/{args.n_seeds}] Seed {seed} failed")
                     
@@ -389,6 +477,23 @@ def main():
         print("-" * 40)
         for i, result in enumerate(valid_results[:10], 1):
             print(f"{i:2d}. Seed {result['seed']:3d}: {result['mean_dice']:.4f} ± {result['std_dice']:.4f}")
+        
+        # Show final checkpoint leaderboard status
+        leaderboard_file = output_dir / "reports" / "checkpoint_leaderboard.json"
+        if leaderboard_file.exists():
+            with open(leaderboard_file, 'r') as f:
+                leaderboard = json.load(f)
+            
+            print(f"\nCheckpoint Management Summary:")
+            print(f"Kept checkpoints for top {args.keep_best_n} seeds:")
+            print("-" * 50)
+            for i, seed_info in enumerate(leaderboard["best_seeds"], 1):
+                print(f"{i:2d}. Seed {seed_info['seed']:3d}: {seed_info['mean_dice']:.4f} (with checkpoints)")
+            
+            total_removed = len(valid_results) - len(leaderboard["best_seeds"])
+            if total_removed > 0:
+                print(f"\nRemoved checkpoints for {total_removed} lower-performing seeds")
+                print("(Results and metrics preserved for all seeds)")
     else:
         logger.error("No successful seed evaluations!")
     

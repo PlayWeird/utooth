@@ -43,6 +43,8 @@ def monitor_progress(output_dir: Path, refresh_interval: int = 5):
                 with open(config_file, 'r') as f:
                     config = json.load(f)
                 print(f"Total seeds to evaluate: {config['n_seeds']}")
+                print(f"Starting seed: {config.get('start_seed', 'N/A')}")
+                print(f"Max epochs: {config.get('max_epochs', 'N/A')}")
                 print(f"GPUs in use: {config['n_gpus']}")
                 print("-"*80)
             
@@ -103,14 +105,36 @@ def monitor_progress(output_dir: Path, refresh_interval: int = 5):
                     print(f"  Mean Dice: {sum(all_dice)/len(all_dice):.4f}")
                     print(f"  Worst Dice: {min(all_dice):.4f}")
                 
-                # Check for errors
+                # Show checkpoint leaderboard status
+                leaderboard_file = output_dir / "reports" / "checkpoint_leaderboard.json"
+                if leaderboard_file.exists():
+                    with open(leaderboard_file, 'r') as f:
+                        leaderboard = json.load(f)
+                    
+                    print(f"\n--- Checkpoint Management ---")
+                    max_seeds = leaderboard.get('max_seeds', 10)
+                    kept_seeds = len(leaderboard.get('best_seeds', []))
+                    total_completed = len(completed_seeds)
+                    removed_checkpoints = max(0, total_completed - max_seeds)
+                    
+                    print(f"  Keeping checkpoints for top {max_seeds} seeds")
+                    print(f"  Currently preserved: {kept_seeds} seeds")
+                    if removed_checkpoints > 0:
+                        print(f"  Removed checkpoints: {removed_checkpoints} seeds")
+                        print(f"  Space saved: ~{removed_checkpoints * 2.6:.1f} GB")
+                
+                # Check for errors in main logs
                 error_count = 0
-                for seed_dir in seed_dirs:
-                    log_file = seed_dir / "seed.log"
-                    if log_file.exists():
-                        with open(log_file, 'r') as f:
-                            if 'ERROR' in f.read():
-                                error_count += 1
+                logs_dir = output_dir / "logs"
+                if logs_dir.exists():
+                    for log_file in logs_dir.glob("seed_*.log"):
+                        try:
+                            with open(log_file, 'r') as f:
+                                content = f.read()
+                                if 'ERROR' in content or 'crashed' in content:
+                                    error_count += 1
+                        except:
+                            continue
                 
                 if error_count > 0:
                     print(f"\n⚠️  Errors detected in {error_count} seed(s)")
