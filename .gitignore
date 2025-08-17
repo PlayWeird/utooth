@@ -172,4 +172,11 @@ outputs/runs/*/metrics/*/metrics.csv
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db
+Thumbs.db# Additional seed search results (2121-2204)
+outputs/seed_search/seed_search_20250815_104509/seeds/seed_21[2-9]*/
+outputs/seed_search/seed_search_20250815_104509/seeds/seed_220*/
+
+# Test and experimental outputs
+outputs/retrain_seed_*/
+outputs/gpu_comparison_*/
+test_*.py
